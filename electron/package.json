@@ -1,0 +1,36 @@
+{
+  "name": "tools45000-pro-desktop",
+  "version": "1.0.0",
+  "author": "Pulso AI",
+  "description": "TOOLS45000 PRO — Sistema de Gestión SG-SST (ISO 45001 & DS 44)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64",
+    "build:all": "electron-builder --win --mac --linux"
+  },
+  "build": {
+    "appId": "com.pulsoai.sgst",
+    "productName": "TOOLS45000 PRO",
+    "directories": { "output": "../dist-electron" },
+    "files": ["main.js", "package.json"],
+    "extraResources": [
+      {
+        "from": "../.next/standalone",
+        "to": "standalone",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  }
+}

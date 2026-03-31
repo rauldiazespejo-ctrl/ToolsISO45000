@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String   // Razón Social
+  rut         String   // RUT empresa
+  business    String   // Giro
+  address     String   // Dirección
+  size        String   // MIPYME / Mediana / Grande
+  workerCount Int      // Número de trabajadores
+  sector      String   // Sector económico
+  logoPath    String?  // Path to logo file
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  documents   SstDocument[]
+}
+
+model SstDocument {
+  id          String   @id @default(cuid())
+  number      Int      // N° documento (1-46)
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  // From Excel
+  category    String   // A, B, C, etc.
+  name        String   // Nombre documento
+  description String   // Descripción/Alcance
+  responsible String   // Responsable
+  priority    String   // Alta / Media
+  normSource  String   // Fuente normativa
+  normRef     String   // Referencia norma
+  
+  // Status tracking
+  status      String   @default("Pendiente") // Pendiente, En Proceso, Completado, No Aplica
+  
+  // Generated content
+  generatedContent String? // AI-generated content (markdown)
+  docxPath         String? // Path to generated .docx file
+  version          Int     @default(1)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model GenerationLog {
+  id         String   @id @default(cuid())
+  companyId  String
+  docId      String?
+  action     String   // generate, edit, download
+  status     String   // success, error
+  message    String?
+  createdAt  DateTime @default(now())
+}
