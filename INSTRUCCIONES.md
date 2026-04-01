@@ -17,10 +17,14 @@ npm install
 # o con bun:
 bun install
 
-# 2. Configurar base de datos (SQLite)
+# 2. Configurar base de datos
+# Para desarrollo local / Vercel:
 npx prisma db push
-# o con bun:
+# O con bun:
 bun run db:push
+
+# Nota: El proyecto usa PostgreSQL por defecto para despliegue en Vercel (Neon). 
+# Para la versión desktop, se puede configurar SQLite si se desea funcionamiento offline.
 
 # 3. Ejecutar en modo desarrollo
 npm run dev
@@ -94,7 +98,7 @@ pulso-ai-project/
 │   ├── lib/                  # Lógica de negocio
 │   └── types/                # Definiciones TypeScript
 ├── prisma/
-│   └── schema.prisma         # Esquema de base de datos SQLite
+│   └── schema.prisma         # Esquema Prisma (PostgreSQL por defecto)
 ├── electron/                  # Wrapper para versión desktop
 ├── public/                    # Archivos estáticos (logos, imágenes)
 ├── package.json
@@ -113,6 +117,7 @@ pulso-ai-project/
 4. **Validador FUF** - Formulario Único de Fiscalización DS 44
 5. **Descarga .docx** con logos y formato profesional
 6. **Pantalla splash** animada con logo de Pulso AI
+7. **Despliegue Web** optimizado para Vercel + Neon
 
 ---
 

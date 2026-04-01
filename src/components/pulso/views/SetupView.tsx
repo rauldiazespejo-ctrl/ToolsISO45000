@@ -27,23 +27,39 @@ export default function SetupView() {
   });
   const [step, setStep] = useState(1);
   const [brandingMode, setBrandingMode] = useState<BrandingMode>(company?.brandingMode || 'pulso');
-  const [clientLogoPreview, setClientLogoPreview] = useState<string | null>(company?.clientLogoPath || null);
+  const [logoData, setLogoData] = useState<string | null>(company?.logoData || null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.name || !form.rut || !form.business) {
       toast.error('Completa los campos obligatorios');
       return;
     }
-    setCompany({
-      name: form.name, rut: form.rut, business: form.business,
-      address: form.address, size: form.size,
-      workerCount: parseInt(form.workerCount) || 1, sector: form.sector,
-      clientLogoPath: clientLogoPreview || undefined,
-      brandingMode,
-    });
-    toast.success('Configuración guardada correctamente');
+    
+    setUploadingLogo(true);
+    try {
+      const resp = await fetch('/api/companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          logoData,
+          brandingMode,
+        }),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        setCompany(data.company);
+        toast.success('Empresa guardada en el repositorio');
+      } else {
+        toast.error(data.error || 'Error al guardar');
+      }
+    } catch (e) {
+      toast.error('Error de conexión');
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,7 +75,7 @@ export default function SetupView() {
       });
       const data = await res.json();
       if (data.success) {
-        setClientLogoPreview(data.path);
+        setLogoData(data.path);
         toast.success('Logo subido correctamente');
       } else {
         toast.error(data.error || 'Error al subir logo');
@@ -72,7 +88,7 @@ export default function SetupView() {
   };
 
   const handleRemoveLogo = () => {
-    setClientLogoPreview(null);
+    setLogoData(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -215,11 +231,11 @@ export default function SetupView() {
                       className="hidden"
                     />
                     <div className="flex flex-col items-center gap-3">
-                      {clientLogoPreview ? (
+                      {logoData ? (
                         <div className="relative group">
                           <div className="w-32 h-32 rounded-xl bg-[#112240] border border-[#1E3A5F] flex items-center justify-center p-2">
                             <img
-                              src={resolveClientLogoUrl(clientLogoPreview)}
+                              src={resolveClientLogoUrl(logoData)}
                               alt="Logo empresa"
                               className="max-w-full max-h-full object-contain"
                               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
@@ -248,7 +264,7 @@ export default function SetupView() {
                           <span className="text-[10px] text-[#475569]">Subir Logo</span>
                         </button>
                       )}
-                      {!clientLogoPreview && !uploadingLogo && (
+                      {!logoData && !uploadingLogo && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -297,7 +313,7 @@ export default function SetupView() {
                             <span className="font-medium text-white text-sm">Solo Logo Empresa</span>
                           </div>
                           <p className="text-xs text-[#64748B] mt-1">Solo se mostrará el logo de tu empresa en los documentos</p>
-                          {!clientLogoPreview && brandingMode === 'soldesp' && (
+                          {!logoData && brandingMode === 'soldesp' && (
                             <p className="text-xs text-[#F59E0B] mt-1">Debes subir un logo primero</p>
                           )}
                         </div>
@@ -319,7 +335,7 @@ export default function SetupView() {
                             <span className="font-medium text-white text-sm">Ambos Logos</span>
                           </div>
                           <p className="text-xs text-[#64748B] mt-1">Logo de tu empresa y marca {APP_PRODUCT_NAME} en los documentos</p>
-                          {!clientLogoPreview && brandingMode === 'both' && (
+                          {!logoData && brandingMode === 'both' && (
                             <p className="text-xs text-[#F59E0B] mt-1">Debes subir un logo primero</p>
                           )}
                         </div>
@@ -359,12 +375,12 @@ export default function SetupView() {
                         brandingMode === 'soldesp' ? 'Solo Logo Empresa' : 'Ambos Logos'
                       }</span>
                       <span className="text-[#64748B]">Logo Empresa:</span>
-                      <span className="text-white">{clientLogoPreview ? 'Cargado' : 'No cargado'}</span>
+                      <span className="text-white">{logoData ? 'Cargado' : 'No cargado'}</span>
                     </div>
-                    {clientLogoPreview && (
+                    {logoData && (
                       <div className="flex items-center gap-3 mt-2 p-2 bg-[#112240] rounded-lg">
                         <div className="w-12 h-12 rounded bg-[#0A1929] flex items-center justify-center p-1">
-                          <img src={resolveClientLogoUrl(clientLogoPreview)} alt="Logo" className="max-w-full max-h-full object-contain" />
+                          <img src={resolveClientLogoUrl(logoData)} alt="Logo" className="max-w-full max-h-full object-contain" />
                         </div>
                         <span className="text-xs text-[#94A3B8] truncate">Logo de {form.name}</span>
                       </div>

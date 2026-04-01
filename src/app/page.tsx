@@ -11,6 +11,7 @@ import DashboardView from '@/components/pulso/views/DashboardView';
 import FufView from '@/components/pulso/views/FufView';
 import AdaptDocumentView from '@/components/pulso/views/AdaptDocumentView';
 import DocumentDetailView from '@/components/pulso/views/DocumentDetailView';
+import CompanySelectorView from '@/components/pulso/views/CompanySelectorView';
 
 // Icons for the Loading State
 import { Shield } from 'lucide-react';
@@ -87,6 +88,18 @@ export default function Home() {
           className="min-h-screen"
         >
           <AdaptDocumentView />
+        </motion.div>
+      )}
+
+      {store.currentView === 'companies' && (
+        <motion.div 
+          key="companies" 
+          initial={{ opacity: 0 }} 
+          animate={{ opacity: 1 }} 
+          exit={{ opacity: 0 }}
+          className="min-h-screen"
+        >
+          <CompanySelectorView />
         </motion.div>
       )}
     </AnimatePresence>

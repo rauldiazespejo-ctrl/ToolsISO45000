@@ -14,7 +14,9 @@ interface AppState {
 
   // Company data
   company: CompanyData | null;
+  companies: CompanyData[];
   setCompany: (data: CompanyData) => void;
+  setCompanies: (data: CompanyData[]) => void;
   setCompanyBranding: (branding: { clientLogoPath?: string; brandingMode: BrandingMode }) => void;
   isCompanyConfigured: boolean;
 
@@ -58,7 +60,7 @@ export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       // View
-      currentView: 'setup',
+      currentView: 'companies',
       setCurrentView: (view) => set({ currentView: view }),
 
       // Selected document
@@ -67,7 +69,13 @@ export const useAppStore = create<AppState>()(
 
       // Company
       company: null,
-      setCompany: (data) => set({ company: { ...data, brandingMode: data.brandingMode || 'pulso' }, isCompanyConfigured: true, currentView: 'dashboard' }),
+      companies: [],
+      setCompany: (data) => set({ 
+        company: { ...data, brandingMode: data.brandingMode || 'pulso' }, 
+        isCompanyConfigured: true, 
+        currentView: 'dashboard' 
+      }),
+      setCompanies: (data) => set({ companies: data }),
       setCompanyBranding: (branding) => set((state) => ({
         company: state.company ? { ...state.company, ...branding } : null,
       })),
@@ -160,6 +168,7 @@ export const useAppStore = create<AppState>()(
       name: 'pulso-ai-storage',
       partialize: (state) => ({
         company: state.company,
+        companies: state.companies,
         isCompanyConfigured: state.isCompanyConfigured,
         documents: state.documents,
         settings: state.settings,

@@ -40,13 +40,13 @@ export async function POST(request: NextRequest) {
       .png()
       .toBuffer();
 
-    const filepath = path.join(getUploadsDir(), CLIENT_LOGO_BASENAME);
-    await writeFile(filepath, pngBuffer);
+    const base64 = pngBuffer.toString('base64');
+    const dataUrl = `data:image/png;base64,${base64}`;
 
     return NextResponse.json({
       success: true,
-      path: '/api/client-logo',
-      filename: CLIENT_LOGO_BASENAME,
+      path: dataUrl,
+      filename: 'logo.png',
     });
   } catch (error) {
     console.error('Logo upload error:', error);

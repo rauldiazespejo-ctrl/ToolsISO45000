@@ -16,7 +16,7 @@ model Company {
   size        String   // MIPYME / Mediana / Grande
   workerCount Int      // Número de trabajadores
   sector      String   // Sector económico
-  logoPath    String?  // Path to logo file
+  logoData    String?  @db.Text // Base64 logo data
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   documents   SstDocument[]

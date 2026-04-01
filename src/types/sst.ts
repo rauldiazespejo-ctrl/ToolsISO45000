@@ -15,6 +15,7 @@ export interface SstDocumentItem {
 export type BrandingMode = 'pulso' | 'soldesp' | 'both';
 
 export interface CompanyData {
+  id?: string;
   name: string;
   rut: string;
   business: string;
@@ -22,12 +23,12 @@ export interface CompanyData {
   size: 'MIPYME' | 'Mediana' | 'Grande';
   workerCount: number;
   sector: string;
-  logoPath?: string;
+  logoData?: string;
   clientLogoPath?: string;
   brandingMode: BrandingMode;
 }
 
-export type ViewType = 'setup' | 'dashboard' | 'document' | 'generate' | 'fuf' | 'settings' | 'adapt';
+export type ViewType = 'setup' | 'dashboard' | 'document' | 'generate' | 'fuf' | 'settings' | 'adapt' | 'companies';
 
 export interface AppSettings {
   apiProvider: 'openai' | 'claude' | 'auto';
