@@ -7,6 +7,7 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win --x64",
+    "build:mac": "electron-builder --mac",
     "build:all": "electron-builder --win --mac --linux"
   },
   "build": {
@@ -23,6 +24,10 @@
     ],
     "win": {
       "target": "nsis"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.business"
     },
     "nsis": {
       "oneClick": false,
