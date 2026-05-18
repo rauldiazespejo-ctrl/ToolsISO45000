@@ -12,6 +12,8 @@ import FufView from '@/components/pulso/views/FufView';
 import AdaptDocumentView from '@/components/pulso/views/AdaptDocumentView';
 import DocumentDetailView from '@/components/pulso/views/DocumentDetailView';
 import CompanySelectorView from '@/components/pulso/views/CompanySelectorView';
+import BowtieView from '@/components/pulso/views/BowtieView';
+import ReviseDocumentsView from '@/components/pulso/views/ReviseDocumentsView';
 
 // Icons for the Loading State
 import { Shield } from 'lucide-react';
@@ -100,6 +102,30 @@ export default function Home() {
           className="min-h-screen"
         >
           <CompanySelectorView />
+        </motion.div>
+      )}
+
+      {store.currentView === 'bowtie' && (
+        <motion.div
+          key="bowtie"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="min-h-screen"
+        >
+          <BowtieView />
+        </motion.div>
+      )}
+
+      {store.currentView === 'revise' && (
+        <motion.div
+          key="revise"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="min-h-screen"
+        >
+          <ReviseDocumentsView />
         </motion.div>
       )}
     </AnimatePresence>

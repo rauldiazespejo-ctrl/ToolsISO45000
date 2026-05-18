@@ -1,7 +1,8 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { CATEGORIES, DOCUMENT_CODES } from '@/lib/sst-documents';
+import type { SstDocumentItem } from '@/types/sst';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -12,8 +13,17 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileText, Loader2, Sparkles, ArrowLeft, XCircle, CheckCircle2, RefreshCw, Eye, FileDown, ClipboardCheck, Settings, Shield, Menu, X, Wrench } from 'lucide-react';
+import { FileText, Loader2, Sparkles, ArrowLeft, XCircle, CheckCircle2, RefreshCw, Eye, FileDown, ClipboardCheck, Shield, Wrench, PenLine, Bot, Layers } from 'lucide-react';
+import { AgentPipelineLog } from '@/components/pulso/AgentPipelineLog';
+import type { AgentStepLog } from '@/lib/agents/types';
 import { APP_PRODUCT_NAME } from '@/lib/product-brand';
+import { DocumentAuditChecklist } from '@/components/pulso/DocumentAuditChecklist';
+import { ConfiguredSignatoriesPanel } from '@/components/pulso/ConfiguredSignatoriesPanel';
+import { AgentReviewPanel } from '@/components/pulso/AgentReviewPanel';
+import type { AgentReviewResult } from '@/lib/agents/types';
+import { areSignatoriesComplete } from '@/lib/signatory-validation';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 export default function DocumentDetailView() {
   const store = useAppStore();
@@ -21,7 +31,155 @@ export default function DocumentDetailView() {
   const company = store.company;
   const [generating, setGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
+  const [docAiReview, setDocAiReview] = useState<AgentReviewResult | null>(null);
+  const [reviewingDoc, setReviewingDoc] = useState(false);
+  const [pipelineLog, setPipelineLog] = useState<AgentStepLog[]>([]);
+  const [forceCloseWithoutAi, setForceCloseWithoutAi] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (doc?.aiReview) {
+      setDocAiReview({
+        approved: doc.aiReview.approved,
+        score: doc.aiReview.score,
+        summary: doc.aiReview.summary,
+        findings: [],
+      });
+    }
+  }, [doc?.number, doc?.aiReview?.revisedAt]);
+
+  const runDocumentAgentReview = async (content: string) => {
+    if (!company || !doc) return;
+    setReviewingDoc(true);
+    setDocAiReview(null);
+    try {
+      const res = await fetch('/api/agents/document-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          docNumber: doc.number,
+          docName: doc.name,
+          normRef: doc.normRef,
+          companyName: company.name,
+          rut: company.rut,
+          size: company.size,
+          content,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDocAiReview(data.review);
+        if (data.review) {
+          store.updateDocumentAiReview(doc.number, {
+            approved: data.review.approved,
+            score: data.review.score,
+            summary: data.review.summary,
+          });
+        }
+        if (data.pipelineLog) setPipelineLog(data.pipelineLog);
+        toast.success(data.review.approved ? `Apto (${data.review.score}%)` : `${data.review.findings.length} hallazgo(s)`);
+      }
+    } catch {
+      toast.error('Agente revisor no disponible');
+    } finally {
+      setReviewingDoc(false);
+    }
+  };
+
+  const runReviseVsPackage = async () => {
+    if (!company || !doc || !generatedContent) return;
+    setReviewingDoc(true);
+    setPipelineLog([{ agent: 'document-corpus-revise', label: 'Revisión vs. paquete documental…', status: 'running', startedAt: new Date().toISOString() }]);
+    try {
+      const res = await fetch('/api/agents/document-revise', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          docNumbers: [doc.number],
+          documents: store.documents,
+          companyName: company.name,
+          rut: company.rut,
+          business: company.business,
+          size: company.size,
+          workerCount: company.workerCount,
+          sector: company.sector,
+        }),
+      });
+      const data = await res.json();
+      const r = data.results?.[0];
+      if (r?.success && r.content) {
+        store.updateDocumentContent(doc.number, r.content);
+        store.updateDocumentStatus(doc.number, 'En Proceso');
+        if (r.review) {
+          setDocAiReview(r.review);
+          store.updateDocumentAiReview(doc.number, {
+            approved: r.review.approved,
+            score: r.review.score,
+            summary: r.review.summary,
+          });
+        }
+        setPipelineLog(r.pipelineLog ?? []);
+        setActiveTab('auditoria');
+        toast.success(`Actualizado con ${r.corpusReferenceCount ?? 0} doc(s) de referencia`);
+      } else {
+        toast.error(r?.error || data.error || 'Error al revisar');
+      }
+    } catch {
+      toast.error('Error de conexión');
+    } finally {
+      setReviewingDoc(false);
+    }
+  };
+
+  const runDocumentFixPipeline = async (content: string) => {
+    if (!company || !doc) return;
+    setReviewingDoc(true);
+    setPipelineLog([{ agent: 'document-fixer', label: 'Corrector regenerando Markdown…', status: 'running', startedAt: new Date().toISOString() }]);
+    try {
+      const res = await fetch('/api/agents/document-pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          docNumber: doc.number,
+          docName: doc.name,
+          description: doc.description,
+          normRef: doc.normRef,
+          companyName: company.name,
+          rut: company.rut,
+          business: company.business,
+          size: company.size,
+          workerCount: company.workerCount,
+          sector: company.sector,
+          content,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        store.updateDocumentContent(doc.number, data.content);
+        setDocAiReview(data.review);
+        if (data.review) {
+          store.updateDocumentAiReview(doc.number, {
+            approved: data.review.approved,
+            score: data.review.score,
+            summary: data.review.summary,
+          });
+        }
+        setPipelineLog(data.pipelineLog ?? []);
+        toast.success('Documento corregido por agentes');
+      } else {
+        toast.error(data.error);
+      }
+    } catch {
+      toast.error('Error en corrector');
+    } finally {
+      setReviewingDoc(false);
+    }
+  };
+
+  useEffect(() => {
+    const tab = store.consumePendingDocumentTab();
+    if (tab) setActiveTab(tab);
+  }, [doc?.number]);
 
   if (!doc) {
     return (
@@ -32,13 +190,36 @@ export default function DocumentDetailView() {
   }
 
   const category = CATEGORIES.find(c => c.id === doc.category);
+  const auditProgress = store.getAuditProgressForDoc(doc.number);
+  const generatedContent = doc.generatedContent;
+  const canDownload = doc.status === 'Completado' && Boolean(generatedContent);
+
+  const canFinalize = store.canFinalizeDocument(doc.number, {
+    forceWithoutAi: forceCloseWithoutAi,
+  });
+  const needsAiApproval =
+    Boolean(generatedContent && doc.aiReview && !doc.aiReview.approved);
+
+  const handleFinalize = () => {
+    if (store.finalizeDocument(doc.number, { forceWithoutAi: forceCloseWithoutAi })) {
+      toast.success('Documento marcado como completado');
+    } else if (!auditProgress.complete) {
+      toast.error('Completa el checklist anti-devolución antes de cerrar');
+    } else if (needsAiApproval && !forceCloseWithoutAi) {
+      toast.error('Los agentes no aprobaron el documento. Corrija o marque cierre sin aprobación IA.');
+    } else {
+      toast.error('No se pudo completar el documento');
+    }
+  };
 
   const handleGenerate = async () => {
     if (!company) return;
     setGenerating(true);
+    setDocAiReview(null);
+    setPipelineLog([{ agent: 'document-generator', label: 'Pipeline multiagente iniciado…', status: 'running', startedAt: new Date().toISOString() }]);
     store.updateDocumentStatus(doc.number, 'En Proceso');
     try {
-      const res = await fetch('/api/generate', {
+      const res = await fetch('/api/agents/document-pipeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -57,8 +238,21 @@ export default function DocumentDetailView() {
       const data = await res.json();
       if (data.success) {
         store.updateDocumentContent(doc.number, data.content);
-        setActiveTab('preview');
-        toast.success('Documento generado exitosamente');
+        setDocAiReview(data.review);
+        if (data.review) {
+          store.updateDocumentAiReview(doc.number, {
+            approved: data.review.approved,
+            score: data.review.score,
+            summary: data.review.summary,
+          });
+        }
+        setPipelineLog(data.pipelineLog ?? []);
+        setActiveTab('auditoria');
+        if (data.review?.approved) {
+          toast.success(`Documento generado y aprobado (${data.review.score}%)`);
+        } else {
+          toast.warning(`Generado con observaciones (${data.review?.score ?? 0}%). Puede ejecutar corrector.`);
+        }
       } else {
         store.updateDocumentStatus(doc.number, 'Pendiente');
         toast.error(data.error);
@@ -72,20 +266,29 @@ export default function DocumentDetailView() {
   };
 
   const handleDownload = async (docBrandingMode?: string) => {
+    const sig = areSignatoriesComplete(company?.signatories);
+    if (!sig.ok) {
+      toast.error(`Configure las firmas: ${sig.missing.join(', ')}`);
+      setActiveTab('firmas');
+      return;
+    }
     try {
       const mode = docBrandingMode || company?.brandingMode || 'pulso';
       const res = await fetch('/api/generate-docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: (doc as any).generatedContent || '',
+          content: generatedContent || '',
           docName: doc.name,
           docCode: DOCUMENT_CODES[doc.number] || `SIG-DOC-${doc.number}`,
           companyName: company?.name || '',
           rut: company?.rut || '',
           version: 1,
           brandingMode: mode,
-          clientLogoPath: company?.clientLogoPath || '',
+          clientLogoPath: company?.clientLogoPath || company?.logoData || '',
+          brandPalette: company?.brandPalette,
+          signatories: company?.signatories,
+          companyId: company?.id,
         }),
       });
       if (!res.ok) throw new Error();
@@ -163,6 +366,15 @@ export default function DocumentDetailView() {
             <TabsTrigger value="preview" className="data-[state=active]:bg-[#1A3050] data-[state=active]:text-[#00D4AA] text-[#94A3B8]">
               <Eye className="w-4 h-4 mr-1" /> Vista Previa
             </TabsTrigger>
+            <TabsTrigger value="auditoria" className="data-[state=active]:bg-[#1A3050] data-[state=active]:text-[#00D4AA] text-[#94A3B8]">
+              <ClipboardCheck className="w-4 h-4 mr-1" /> Checklist
+              {!auditProgress.complete && generatedContent && (
+                <span className="ml-1 w-2 h-2 rounded-full bg-[#F59E0B]" />
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="firmas" className="data-[state=active]:bg-[#1A3050] data-[state=active]:text-[#00D4AA] text-[#94A3B8]">
+              <PenLine className="w-4 h-4 mr-1" /> Firmas
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="info" className="mt-4 space-y-4">
@@ -207,17 +419,25 @@ export default function DocumentDetailView() {
 
             {/* Actions */}
             <div className="flex flex-wrap gap-3">
-              {doc.status !== 'Completado' && (
+              {(doc.status === 'Pendiente' || (doc.status === 'En Proceso' && !generatedContent)) && (
                 <Button onClick={handleGenerate} disabled={generating}
                   className="bg-[#00D4AA] text-[#0A1929] hover:bg-[#00A888]">
-                  {generating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generando...</> : <><Sparkles className="w-4 h-4 mr-2" /> Generar con IA</>}
+                  {generating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Pipeline…</> : <><Bot className="w-4 h-4 mr-2" /> Generar (multiagente)</>}
                 </Button>
               )}
-              {doc.status === 'Completado' && (
+              {doc.status === 'En Proceso' && generatedContent && (
+                <Button onClick={() => setActiveTab('auditoria')} className="bg-[#F59E0B] text-[#0A1929] hover:bg-[#D97706]">
+                  <ClipboardCheck className="w-4 h-4 mr-2" />
+                  Checklist ({auditProgress.done}/{auditProgress.total})
+                </Button>
+              )}
+              {generatedContent && doc.status !== 'Pendiente' && (
+                <Button size="sm" variant="outline" className="border-[#1E3A5F] text-[#94A3B8]" onClick={handleGenerate} disabled={generating}>
+                  {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Regenerar
+                </Button>
+              )}
+              {canDownload && (
                 <>
-                  <Button size="sm" variant="outline" className="border-[#1E3A5F] text-[#94A3B8]" onClick={handleGenerate} disabled={generating}>
-                    {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Regenerar
-                  </Button>
                   <Button size="sm" onClick={() => handleDownload()} className="bg-[#00D4AA] text-[#0A1929] hover:bg-[#00A888]">
                     <FileDown className="w-4 h-4 mr-2" /> Descargar .docx
                   </Button>
@@ -238,25 +458,44 @@ export default function DocumentDetailView() {
               <Button variant="outline" onClick={() => { store.updateDocumentStatus(doc.number, 'No Aplica'); store.setCurrentView('dashboard'); }} className="border-[#1E3A5F] text-[#64748B]">
                 <XCircle className="w-4 h-4 mr-2" /> Marcar No Aplica
               </Button>
+              {generatedContent && (
+                <Button
+                  variant="outline"
+                  onClick={runReviseVsPackage}
+                  disabled={reviewingDoc}
+                  className="border-[#8B5CF6]/40 text-[#C4B5FD] hover:bg-[#8B5CF6]/10"
+                >
+                  <Layers className="w-4 h-4 mr-2" /> Revisar vs. paquete SST
+                </Button>
+              )}
               <Button variant="outline" onClick={() => store.setCurrentView('adapt')} className="border-[#F59E0B]/30 text-[#F59E0B] hover:bg-[#F59E0B]/10">
-                <Wrench className="w-4 h-4 mr-2" /> Adaptar Documento Existente
+                <Wrench className="w-4 h-4 mr-2" /> Adaptar documento externo
+              </Button>
+              <Button variant="outline" onClick={() => store.setCurrentView('revise')} className="border-[#1E3A5F] text-[#94A3B8]">
+                <Layers className="w-4 h-4 mr-2" /> Todos los previos
               </Button>
             </div>
           </TabsContent>
 
           <TabsContent value="preview" className="mt-4">
-            {(doc as any).generatedContent ? (
+            {generatedContent ? (
               <Card className="bg-[#112240] border-[#1E3A5F]">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-white">Vista Previa del Documento</CardTitle>
-                  <Button size="sm" onClick={() => handleDownload()} className="bg-[#00D4AA] text-[#0A1929] hover:bg-[#00A888]">
-                    <FileDown className="w-4 h-4 mr-1" /> .docx
-                  </Button>
+                  {canDownload ? (
+                    <Button size="sm" onClick={() => handleDownload()} className="bg-[#00D4AA] text-[#0A1929] hover:bg-[#00A888]">
+                      <FileDown className="w-4 h-4 mr-1" /> .docx
+                    </Button>
+                  ) : (
+                    <Badge className="bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/30 text-xs">
+                      Completa el checklist para descargar
+                    </Badge>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[calc(100vh-250px)]">
                     <div className="prose prose-invert max-w-none" ref={contentRef}>
-                      {renderMarkdown((doc as any).generatedContent)}
+                      {renderMarkdown(generatedContent)}
                     </div>
                   </ScrollArea>
                 </CardContent>
@@ -271,6 +510,76 @@ export default function DocumentDetailView() {
                 </Button>
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="auditoria" className="mt-4 space-y-4">
+            {(generating || reviewingDoc || pipelineLog.length > 0) && (
+              <AgentPipelineLog steps={pipelineLog} title="Agentes documento SST" />
+            )}
+            <AgentReviewPanel review={docAiReview} loading={(generating || reviewingDoc) && !docAiReview} />
+            {generatedContent && docAiReview && !docAiReview.approved && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  className="bg-[#F59E0B] text-[#0A1929]"
+                  disabled={reviewingDoc}
+                  onClick={() => runDocumentFixPipeline(generatedContent)}
+                >
+                  <Bot className="w-4 h-4 mr-1" /> Corregir con agentes
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-[#1E3A5F] text-[#94A3B8]"
+                  disabled={reviewingDoc}
+                  onClick={() => runDocumentAgentReview(generatedContent)}
+                >
+                  Solo re-revisar
+                </Button>
+              </div>
+            )}
+            <DocumentAuditChecklist
+              doc={doc}
+              checks={doc.auditChecks ?? {}}
+              onToggle={(id, checked) => store.updateAuditCheck(doc.number, id, checked)}
+              hasGeneratedContent={Boolean(generatedContent)}
+            />
+            {generatedContent && (
+              <div className="space-y-3">
+                {needsAiApproval && (
+                  <div className="flex items-start gap-2 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/5 p-3">
+                    <Checkbox
+                      id="force-close-ai"
+                      checked={forceCloseWithoutAi}
+                      onCheckedChange={(v) => setForceCloseWithoutAi(v === true)}
+                    />
+                    <Label htmlFor="force-close-ai" className="text-sm text-[#94A3B8] cursor-pointer leading-snug">
+                      Cerrar sin aprobación de agentes (uso bajo su responsabilidad; los agentes reportaron observaciones)
+                    </Label>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-3">
+                <Button
+                  onClick={handleFinalize}
+                  disabled={!canFinalize}
+                  className="bg-[#00D4AA] text-[#0A1929] hover:bg-[#00A888] disabled:opacity-40"
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Marcar documento completado
+                </Button>
+                <Button variant="outline" onClick={() => setActiveTab('preview')} className="border-[#1E3A5F] text-[#94A3B8]">
+                  <Eye className="w-4 h-4 mr-2" /> Revisar contenido
+                </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="firmas" className="mt-4">
+            <ConfiguredSignatoriesPanel
+              signatories={company?.signatories}
+              rut={company?.rut}
+            />
           </TabsContent>
         </Tabs>
       </div>

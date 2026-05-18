@@ -24,17 +24,44 @@ import {
 } from 'docx';
 import { CLIENT_LOGO_BASENAME, getUploadsDir } from '@/lib/upload-paths';
 import { APP_PRODUCT_NAME } from '@/lib/product-brand';
+import {
+  decodeLogoDataUrl,
+  extractPaletteFromBuffer,
+  paletteToDocxColors,
+  PULSO_DEFAULT_PALETTE,
+  type DocBrandPalette,
+} from '@/lib/brand-colors';
+import { renderSignaturePng } from '@/lib/signature-render';
+import type { CompanySignatories, SignatoryConfig } from '@/types/sst';
 
-// ─── Soldesp Color Scheme ───────────────────────────────────────────────────
+// Colores mutables por solicitud (se restauran al finalizar cada POST)
 const C = {
-  turquoise: '00D4AA',
-  navy: '1B2A4A',
-  white: 'FFFFFF',
-  textDark: '2D3748',
-  textMedium: '4A5568',
-  lightGray: 'F8FAFC',
-  tableBorder: 'E2E8F0',
+  ...paletteToDocxColors(PULSO_DEFAULT_PALETTE),
+  accent: PULSO_DEFAULT_PALETTE.accent,
 };
+
+function resetDocColors() {
+  Object.assign(C, {
+    ...paletteToDocxColors(PULSO_DEFAULT_PALETTE),
+    accent: PULSO_DEFAULT_PALETTE.accent,
+  });
+}
+
+async function applyBrandToDocColors(
+  brandPalette: DocBrandPalette | undefined,
+  logoBuf: Buffer | null
+) {
+  let palette = brandPalette;
+  if (!palette && logoBuf) {
+    palette = await extractPaletteFromBuffer(logoBuf);
+  }
+  if (palette) {
+    Object.assign(C, {
+      ...paletteToDocxColors(palette),
+      accent: palette.accent,
+    });
+  }
+}
 
 const PRODUCT_DOC_BRAND = APP_PRODUCT_NAME;
 
@@ -263,6 +290,47 @@ function tr(text: string, bold = false): TextRun {
   return new TextRun({ text, bold, color: C.textDark, size: 22, font: 'Calibri' });
 }
 
+function signatureImageCell(imageBuf: Buffer, colSpan: number): TableCell {
+  const borders = {
+    top: { style: BorderStyle.SINGLE, size: 1, color: C.tableBorder },
+    bottom: { style: BorderStyle.SINGLE, size: 1, color: C.tableBorder },
+    left: { style: BorderStyle.SINGLE, size: 1, color: C.tableBorder },
+    right: { style: BorderStyle.SINGLE, size: 1, color: C.tableBorder },
+  };
+  return new TableCell({
+    columnSpan: colSpan,
+    verticalAlign: VerticalAlign.CENTER,
+    borders,
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 40, after: 40 },
+        children: [
+          new ImageRun({
+            data: imageBuf,
+            type: 'png',
+            transformation: { width: 220, height: 62 },
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+async function renderSignatoryBlock(
+  signatory: SignatoryConfig | undefined,
+  auditSeed: string
+): Promise<Buffer | null> {
+  if (!signatory?.fullName?.trim()) return null;
+  const { buffer } = await renderSignaturePng({
+    fullName: signatory.fullName,
+    initials: signatory.initials,
+    styleId: signatory.styleId,
+    auditSeed,
+  });
+  return buffer;
+}
+
 function inlineBold(text: string): TextRun[] {
   const parts: TextRun[] = [];
   const re = /\*\*(.*?)\*\*/g;
@@ -287,6 +355,9 @@ interface ReqBody {
   version?: number;
   brandingMode?: 'pulso' | 'soldesp' | 'both';
   clientLogoPath?: string;
+  brandPalette?: DocBrandPalette;
+  signatories?: CompanySignatories;
+  companyId?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -300,6 +371,10 @@ export async function POST(request: NextRequest) {
       rut,
       version = 1,
       brandingMode = 'pulso',
+      clientLogoPath,
+      brandPalette,
+      signatories,
+      companyId,
     } = body;
 
     if (!content || !docName || !docCode || !companyName) {
@@ -318,13 +393,15 @@ export async function POST(request: NextRequest) {
     });
     const todayShort = new Date().toLocaleDateString('es-CL');
 
-    let clientLogoBuf: Buffer | null = null;
-    if (brandingMode === 'soldesp' || brandingMode === 'both') {
+    let clientLogoBuf: Buffer | null = decodeLogoDataUrl(clientLogoPath);
+    if (!clientLogoBuf && (brandingMode === 'soldesp' || brandingMode === 'both')) {
       const uploadsFile = path.join(getUploadsDir(), CLIENT_LOGO_BASENAME);
       const legacyPublic = path.join(process.cwd(), 'public', CLIENT_LOGO_BASENAME);
       if (existsSync(uploadsFile)) clientLogoBuf = readFileSync(uploadsFile);
       else if (existsSync(legacyPublic)) clientLogoBuf = readFileSync(legacyPublic);
     }
+
+    await applyBrandToDocColors(brandPalette, clientLogoBuf);
 
     const showClientImage =
       clientLogoBuf !== null && (brandingMode === 'soldesp' || brandingMode === 'both');
@@ -378,11 +455,26 @@ export async function POST(request: NextRequest) {
       rows: [new TableRow({ children: [leftLogoCell, rightLogoCell] })],
     });
 
-    // Formalización table (10 columns: Elaborado 3, Revisado 3, Aprobado 4)
+    const seedBase = companyId || rut || companyName;
+    const elaborado = signatories?.elaborado;
+    const revisado = signatories?.revisado;
+    const aprobado = signatories?.aprobado;
+
+    const [sigElab, sigRev, sigAprob] = await Promise.all([
+      renderSignatoryBlock(elaborado, `${seedBase}|ELABORADO`),
+      renderSignatoryBlock(revisado, `${seedBase}|REVISADO`),
+      renderSignatoryBlock(aprobado, `${seedBase}|APROBADO`),
+    ]);
+
+    const firmaCell = (buf: Buffer | null, colSpan: number) =>
+      buf
+        ? signatureImageCell(buf, colSpan)
+        : cell('—', { colSpan, align: AlignmentType.CENTER, fontSize: 18 });
+
+    // Formalización (Elaborado 3 cols, Revisado 3, Aprobado 4)
     const formalTable = new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
       rows: [
-        // Section header row
         new TableRow({
           children: [
             cell('ELABORADO', {
@@ -411,64 +503,44 @@ export async function POST(request: NextRequest) {
             }),
           ],
         }),
-        // Name row
         new TableRow({
           children: [
             cell('Nombre', { bold: true, shading: C.lightGray, fontSize: 18, width: 10 }),
-            cell('', { width: 20 }),
-            cell('', { width: 20 }),
+            cell(elaborado?.fullName || '—', { colSpan: 2, fontSize: 18 }),
             cell('Nombre', { bold: true, shading: C.lightGray, fontSize: 18, width: 10 }),
-            cell('', { width: 20 }),
-            cell('', { width: 20 }),
+            cell(revisado?.fullName || '—', { colSpan: 2, fontSize: 18 }),
             cell('Nombre', { bold: true, shading: C.lightGray, fontSize: 18, width: 10 }),
-            cell('', { width: 15 }),
-            cell('', { width: 15 }),
-            cell('', { width: 10 }),
+            cell(aprobado?.fullName || '—', { colSpan: 3, fontSize: 18 }),
           ],
         }),
-        // Cargo row
         new TableRow({
           children: [
             cell('Cargo', { bold: true, shading: C.lightGray, fontSize: 18, width: 10 }),
-            cell('', { width: 20 }),
-            cell('', { width: 20 }),
+            cell(elaborado?.jobTitle || '—', { colSpan: 2, fontSize: 18 }),
             cell('Cargo', { bold: true, shading: C.lightGray, fontSize: 18, width: 10 }),
-            cell('', { width: 20 }),
-            cell('', { width: 20 }),
+            cell(revisado?.jobTitle || '—', { colSpan: 2, fontSize: 18 }),
             cell('Cargo', { bold: true, shading: C.lightGray, fontSize: 18, width: 10 }),
-            cell('', { width: 15 }),
-            cell('', { width: 15 }),
-            cell('', { width: 10 }),
+            cell(aprobado?.jobTitle || '—', { colSpan: 3, fontSize: 18 }),
           ],
         }),
-        // Firma row
         new TableRow({
           children: [
             cell('Firma', { bold: true, shading: C.lightGray, fontSize: 18, width: 10 }),
-            cell('', { width: 20 }),
-            cell('', { width: 20 }),
+            firmaCell(sigElab, 2),
             cell('Firma', { bold: true, shading: C.lightGray, fontSize: 18, width: 10 }),
-            cell('', { width: 20 }),
-            cell('', { width: 20 }),
+            firmaCell(sigRev, 2),
             cell('Firma', { bold: true, shading: C.lightGray, fontSize: 18, width: 10 }),
-            cell('', { width: 15 }),
-            cell('', { width: 15 }),
-            cell('', { width: 10 }),
+            firmaCell(sigAprob, 3),
           ],
         }),
-        // Date row
         new TableRow({
           children: [
             cell('Fecha', { bold: true, shading: C.lightGray, fontSize: 18, width: 10 }),
-            cell(todayShort, { width: 20 }),
-            cell('', { width: 20 }),
+            cell(todayShort, { colSpan: 2, align: AlignmentType.CENTER, fontSize: 18 }),
             cell('Fecha', { bold: true, shading: C.lightGray, fontSize: 18, width: 10 }),
-            cell(todayShort, { width: 20 }),
-            cell('', { width: 20 }),
+            cell(todayShort, { colSpan: 2, align: AlignmentType.CENTER, fontSize: 18 }),
             cell('Fecha', { bold: true, shading: C.lightGray, fontSize: 18, width: 10 }),
-            cell(todayShort, { width: 15 }),
-            cell('', { width: 15 }),
-            cell('', { width: 10 }),
+            cell(todayShort, { colSpan: 3, align: AlignmentType.CENTER, fontSize: 18 }),
           ],
         }),
       ],
@@ -903,5 +975,7 @@ export async function POST(request: NextRequest) {
       { success: false, error: `Error al generar DOCX: ${msg}` },
       { status: 500 }
     );
+  } finally {
+    resetDocColors();
   }
 }

@@ -7,6 +7,9 @@ import { CATEGORIES, DOCUMENT_CODES } from '@/lib/sst-documents';
 import { resolveClientLogoUrl } from '@/lib/client-logo-url';
 import { APP_PRODUCT_NAME } from '@/lib/product-brand';
 import { CreatorCredit } from '@/components/pulso/CreatorCredit';
+import { DashboardWorkflowSummary } from '@/components/pulso/DashboardWorkflowSummary';
+import { areSignatoriesComplete } from '@/lib/signatory-validation';
+import { ConfiguredSignatoriesPanel } from '@/components/pulso/ConfiguredSignatoriesPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,8 +18,8 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
-import { Shield, Building2, Users, Search, Filter, Download, RefreshCw, ChevronRight, ChevronLeft, CheckCircle2, Clock, AlertTriangle, XCircle, Sparkles, Menu, X, Eye, Loader2, Zap, FileText, FileDown, Target, TrendingUp, Upload, ClipboardCheck, Wrench, ImageIcon, ImagePlus, Trash2, Settings } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Shield, Building2, Users, Search, Filter, Download, RefreshCw, ChevronRight, ChevronLeft, CheckCircle2, Clock, AlertTriangle, XCircle, Sparkles, Menu, X, Eye, Loader2, Zap, FileText, FileDown, Target, TrendingUp, Upload, ClipboardCheck, Wrench, ImageIcon, ImagePlus, Trash2, Settings, PenLine, GitBranch, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function DashboardView() {
@@ -26,6 +29,7 @@ export default function DashboardView() {
   const filteredDocs = store.getFilteredDocuments();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [generatingDoc, setGeneratingDoc] = useState<number | null>(null);
+  const [showSignatories, setShowSignatories] = useState(false);
 
   const handleGenerate = async (doc) => {
     if (!company) return;
@@ -33,7 +37,7 @@ export default function DashboardView() {
     store.setIsGenerating(true);
     store.updateDocumentStatus(doc.number, 'En Proceso');
     try {
-      const res = await fetch('/api/generate', {
+      const res = await fetch('/api/agents/document-pipeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -52,7 +56,18 @@ export default function DashboardView() {
       const data = await res.json();
       if (data.success) {
         store.updateDocumentContent(doc.number, data.content);
-        toast.success(`"${doc.name}" generado exitosamente`);
+        if (data.review) {
+          store.updateDocumentAiReview(doc.number, {
+            approved: data.review.approved,
+            score: data.review.score,
+            summary: data.review.summary,
+          });
+        }
+        store.openDocumentWorkflow(doc.number, 'auditoria');
+        const msg = data.review?.approved
+          ? `"${doc.name}" aprobado por agentes (${data.review.score}%).`
+          : `"${doc.name}" generado con observaciones — revise en checklist.`;
+        toast.success(msg);
       } else {
         store.updateDocumentStatus(doc.number, 'Pendiente');
         toast.error(`Error: ${data.error}`);
@@ -67,19 +82,28 @@ export default function DashboardView() {
   };
 
   const handleDownload = async (doc) => {
+    const sig = areSignatoriesComplete(company?.signatories);
+    if (!sig.ok) {
+      toast.error(`Configure las firmas: ${sig.missing.join(', ')}`);
+      setShowSignatories(true);
+      return;
+    }
     try {
       const res = await fetch('/api/generate-docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: (doc as any).generatedContent || '',
+          content: doc.generatedContent || '',
           docName: doc.name,
           docCode: DOCUMENT_CODES[doc.number] || `DOC-${doc.number}`,
           companyName: company?.name || '',
           rut: company?.rut || '',
           version: 1,
           brandingMode: company?.brandingMode || 'pulso',
-          clientLogoPath: company?.clientLogoPath || '',
+          clientLogoPath: company?.clientLogoPath || company?.logoData || '',
+          brandPalette: company?.brandPalette,
+          signatories: company?.signatories,
+          companyId: company?.id,
         }),
       });
       if (!res.ok) throw new Error('Failed');
@@ -164,6 +188,15 @@ export default function DashboardView() {
             }}>
               <FileDown className="w-4 h-4 mr-1" /> Descargar Proyecto
             </Button>
+            <Button variant="outline" size="sm" className="border-[#8B5CF6]/40 text-[#C4B5FD] hover:bg-[#8B5CF6]/10" onClick={() => store.setCurrentView('revise')}>
+              <Layers className="w-4 h-4 mr-1" /> Revisar previos
+            </Button>
+            <Button variant="outline" size="sm" className="border-[#F97316]/40 text-[#FDBA74] hover:bg-[#F97316]/10" onClick={() => store.setCurrentView('bowtie')}>
+              <GitBranch className="w-4 h-4 mr-1" /> Bowtie
+            </Button>
+            <Button variant="outline" size="sm" className="border-[#1E3A5F] text-[#94A3B8]" onClick={() => setShowSignatories(true)}>
+              <PenLine className="w-4 h-4 mr-1" /> Firmas
+            </Button>
             <Button variant="outline" size="sm" className="border-[#1E3A5F] text-[#94A3B8]" onClick={() => store.setCurrentView('setup')}>
               <Settings className="w-4 h-4" />
             </Button>
@@ -188,6 +221,7 @@ export default function DashboardView() {
                 <span>{stats.pending} pendientes</span>
               </div>
             </div>
+            <DashboardWorkflowSummary />
             {/* Category Navigation */}
             <div className="text-[10px] text-[#475569] uppercase tracking-wider mb-2 px-1">Categorías</div>
             {CATEGORIES.map(cat => {
@@ -254,7 +288,9 @@ export default function DashboardView() {
           {/* Document List */}
           <div className="space-y-2">
             <AnimatePresence>
-              {filteredDocs.map((doc, idx) => (
+              {filteredDocs.map((doc, idx) => {
+                const audit = store.getAuditProgressForDoc(doc.number);
+                return (
                 <motion.div key={doc.number} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.02, 0.3) }}>
                   <Card className="bg-[#112240] border-[#1E3A5F] card-hover cursor-pointer group" onClick={() => { store.setSelectedDocNumber(doc.number); store.setCurrentView('document'); }}>
                     <CardContent className="p-3 sm:p-4">
@@ -279,13 +315,30 @@ export default function DashboardView() {
                               <span className="hidden sm:inline ml-1">Generar</span>
                             </Button>
                           )}
+                          {doc.status === 'En Proceso' && doc.generatedContent && (
+                            <Button
+                              size="sm"
+                              className="bg-[#F59E0B] text-[#0A1929] hover:bg-[#D97706] text-xs h-7 px-2"
+                              onClick={() => store.openDocumentWorkflow(doc.number, 'auditoria')}
+                            >
+                              <ClipboardCheck className="w-3 h-3" />
+                              <span className="hidden sm:inline ml-1">{audit.done}/{audit.total}</span>
+                            </Button>
+                          )}
                           {doc.status === 'Completado' && (
                             <>
                               <Button size="sm" variant="outline" className="border-[#1E3A5F] text-[#94A3B8] text-xs h-7 px-2" onClick={() => handleDownload(doc)}>
                                 <FileDown className="w-3 h-3" />
                                 <span className="hidden sm:inline ml-1">.docx</span>
                               </Button>
-                              <Button size="sm" variant="ghost" className="text-[#64748B] text-xs h-7 px-2"><Eye className="w-3 h-3" /></Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-[#64748B] text-xs h-7 px-2"
+                                onClick={() => store.openDocumentWorkflow(doc.number, 'preview')}
+                              >
+                                <Eye className="w-3 h-3" />
+                              </Button>
                             </>
                           )}
                         </div>
@@ -293,7 +346,7 @@ export default function DashboardView() {
                     </CardContent>
                   </Card>
                 </motion.div>
-              ))}
+              );})}
             </AnimatePresence>
             {filteredDocs.length === 0 && (
               <div className="text-center py-12"><Search className="w-12 h-12 text-[#334155] mx-auto mb-4" /><p className="text-[#64748B]">No se encontraron documentos</p></div>
@@ -301,6 +354,32 @@ export default function DashboardView() {
           </div>
         </main>
       </div>
+
+      <Dialog open={showSignatories} onOpenChange={setShowSignatories}>
+        <DialogContent className="bg-[#112240] border-[#1E3A5F] text-white max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white">Firmas de la empresa</DialogTitle>
+            <DialogDescription className="text-[#94A3B8]">
+              Así quedarán en la tabla de formalización de cada documento Word.
+            </DialogDescription>
+          </DialogHeader>
+          <ConfiguredSignatoriesPanel
+            signatories={company?.signatories}
+            rut={company?.rut}
+            compact
+          />
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" className="border-[#1E3A5F] text-[#94A3B8]" asChild>
+              <a href="/preview-firmas-configuradas.html" target="_blank" rel="noreferrer">
+                Ejemplo con nombres demo
+              </a>
+            </Button>
+            <Button className="bg-[#00D4AA] text-[#0A1929]" onClick={() => { setShowSignatories(false); store.setCurrentView('setup'); }}>
+              Editar en configuración
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

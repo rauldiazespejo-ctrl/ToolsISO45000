@@ -33,14 +33,14 @@ export default function CompanySelectorView() {
 
   const handleSelectCompany = async (comp: CompanyData) => {
     if (!comp.id) return;
-    
+
     setLoading(true);
     try {
       const res = await fetch(`/api/companies/${comp.id}/documents`);
       const data = await res.json();
       if (data.success) {
         useAppStore.getState().setDocuments(data.documents);
-        setCompany(comp);
+        setCompany(data.company ?? comp);
         setCurrentView('dashboard');
       }
     } catch (error) {

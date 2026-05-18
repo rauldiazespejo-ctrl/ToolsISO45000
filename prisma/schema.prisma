@@ -16,10 +16,13 @@ model Company {
   size        String   // MIPYME / Mediana / Grande
   workerCount Int      // Número de trabajadores
   sector      String   // Sector económico
-  logoData    String?  @db.Text // Base64 logo data
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  documents   SstDocument[]
+  logoData         String?  @db.Text // Base64 logo data
+  signatoriesJson  String?  @db.Text // Firmas DocuSign JSON
+  brandingJson     String?  @db.Text // brandPalette + brandingMode
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  documents        SstDocument[]
+  bowties          BowtieAnalysis[]
 }
 
 model SstDocument {
@@ -42,11 +45,33 @@ model SstDocument {
   
   // Generated content
   generatedContent String? // AI-generated content (markdown)
+  auditChecksJson  String? @db.Text // Checklist anti-devolución JSON
+  aiReviewJson     String? @db.Text // Última revisión multiagente
   docxPath         String? // Path to generated .docx file
   version          Int     @default(1)
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model BowtieAnalysis {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  code         String
+  title        String
+  hazard       String
+  topEvent     String
+  activity     String   @default("")
+  area         String   @default("")
+  criticality  String   // critico | alto
+  diagramData  String   @db.Text // JSON BowtieModel v1
+  markdown     String?  @db.Text
+  status       String   @default("generado")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([companyId])
 }
 
 model GenerationLog {

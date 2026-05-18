@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
 import path from 'path';
+import { writeFile } from 'fs/promises';
 import sharp from 'sharp';
-import { CLIENT_LOGO_BASENAME, ensureUploadsDir, getUploadsDir } from '@/lib/upload-paths';
+import {
+  CLIENT_LOGO_BASENAME,
+  ensureUploadsDir,
+  getUploadsDir,
+} from '@/lib/upload-paths';
+import { extractPaletteFromBuffer, type DocBrandPalette } from '@/lib/brand-colors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,13 +45,19 @@ export async function POST(request: NextRequest) {
       .png()
       .toBuffer();
 
+    const logoPath = path.join(getUploadsDir(), CLIENT_LOGO_BASENAME);
+    await writeFile(logoPath, pngBuffer);
+
+    const brandPalette: DocBrandPalette = await extractPaletteFromBuffer(pngBuffer);
     const base64 = pngBuffer.toString('base64');
     const dataUrl = `data:image/png;base64,${base64}`;
 
     return NextResponse.json({
       success: true,
       path: dataUrl,
+      clientLogoPath: '/api/client-logo',
       filename: 'logo.png',
+      brandPalette,
     });
   } catch (error) {
     console.error('Logo upload error:', error);

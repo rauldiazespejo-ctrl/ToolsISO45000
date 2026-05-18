@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Previsualización — Firmas automáticas | TOOLS45000 PRO</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Calibri, 'Segoe UI', system-ui, sans-serif;
+      background: #0A1929;
+      color: #2D3748;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .toolbar {
+      max-width: 1180px;
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .toolbar h1 { font-size: 1.1rem; color: #00D4AA; font-weight: 600; }
+    .toolbar p { font-size: 0.8rem; color: #94A3B8; }
+    .badge {
+      background: #00D4AA20;
+      color: #00D4AA;
+      border: 1px solid #00D4AA50;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 24px;
+      max-width: 1180px;
+      margin: 0 auto;
+      align-items: start;
+    }
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+      .config-panel { order: -1; }
+    }
+    .page {
+      max-width: 794px;
+      min-height: 1123px;
+      margin: 0 auto;
+      background: #fff;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.45);
+      padding: 48px 56px 56px;
+      position: relative;
+    }
+    .page::before {
+      content: 'PREVISUALIZACIÓN';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-35deg);
+      font-size: 4rem;
+      font-weight: 700;
+      color: rgba(0, 212, 170, 0.06);
+      letter-spacing: 0.2em;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .logos {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #00D4AA;
+    }
+    .logo-box { height: 56px; display: flex; align-items: center; }
+    .logo-box.product { justify-content: flex-end; color: #1B2A4A; font-weight: 700; font-size: 0.95rem; }
+    .logo-placeholder {
+      width: 120px; height: 48px;
+      background: linear-gradient(135deg, #E2E8F0, #F8FAFC);
+      border: 1px dashed #CBD5E1; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; color: #94A3B8;
+    }
+    .doc-meta { text-align: center; margin: 40px 0 36px; }
+    .doc-code { font-size: 0.85rem; color: #4A5568; letter-spacing: 0.05em; margin-bottom: 8px; }
+    .doc-title { font-size: 1.65rem; font-weight: 700; color: #1B2A4A; line-height: 1.25; margin-bottom: 12px; }
+    .doc-type {
+      display: inline-block; background: #00D4AA; color: #fff;
+      font-size: 0.7rem; font-weight: 700; padding: 4px 14px; letter-spacing: 0.08em;
+    }
+    .company-block { margin-top: 28px; font-size: 0.9rem; color: #4A5568; line-height: 1.6; }
+    .company-block strong { color: #1B2A4A; }
+    .formal-section { margin-top: 48px; }
+    .formal-section h3 {
+      font-size: 0.75rem; color: #4A5568; text-transform: uppercase;
+      letter-spacing: 0.1em; margin-bottom: 10px;
+    }
+    table.formal { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
+    table.formal th {
+      background: #00D4AA; color: #fff; font-weight: 700;
+      padding: 8px 6px; text-align: center; border: 1px solid #00D4AA;
+    }
+    table.formal td { border: 1px solid #E2E8F0; padding: 6px 8px; vertical-align: middle; }
+    table.formal td.label { background: #F8FAFC; font-weight: 700; color: #2D3748; width: 12%; }
+    table.formal td.sig-cell { text-align: center; height: 52px; background: #fff; }
+    .signature {
+      font-family: 'Brush Script MT', 'Segoe Script', cursive;
+      font-size: 1.35rem; color: #1B3A5C; line-height: 1; opacity: 0.92;
+    }
+    .signature.auto {
+      background: linear-gradient(90deg, transparent, #00D4AA15, transparent);
+      padding: 4px 8px; border-radius: 2px;
+    }
+    .footer-note {
+      margin-top: 32px; padding-top: 16px; border-top: 1px solid #E2E8F0;
+      font-size: 0.68rem; color: #94A3B8; text-align: center;
+    }
+    .config-panel {
+      background: #112240; border: 1px solid #1E3A5F; border-radius: 12px; padding: 20px;
+    }
+    .config-panel h2 { font-size: 0.9rem; color: #fff; margin-bottom: 16px; }
+    .signer-card {
+      background: #0A1929; border: 1px solid #1E3A5F; border-radius: 8px;
+      padding: 12px; margin-bottom: 12px;
+    }
+    .signer-card .role {
+      font-size: 0.65rem; color: #00D4AA; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .signer-card .name { color: #fff; font-size: 0.85rem; margin: 4px 0 2px; }
+    .signer-card .cargo { color: #94A3B8; font-size: 0.75rem; }
+    .mini-sig {
+      margin-top: 8px; height: 28px; border-top: 1px dashed #1E3A5F;
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    .mini-sig span { font-family: 'Brush Script MT', cursive; font-size: 1rem; color: #00D4AA; }
+    .hint { font-size: 0.7rem; color: #64748B; line-height: 1.5; margin-top: 12px; }
+    .hint code { color: #00D4AA; font-size: 0.65rem; }
+    .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 0.75rem; color: #94A3B8; }
+    .toggle {
+      width: 36px; height: 20px; background: #00D4AA; border-radius: 999px; position: relative;
+    }
+    .toggle::after {
+      content: ''; position: absolute; right: 3px; top: 3px;
+      width: 14px; height: 14px; background: #fff; border-radius: 50%;
+    }
+    .doc-picker {
+      margin-top: 16px; padding-top: 16px; border-top: 1px solid #1E3A5F;
+    }
+    .doc-picker label { font-size: 0.7rem; color: #94A3B8; display: block; margin-bottom: 6px; }
+    .doc-picker select {
+      width: 100%; padding: 8px; border-radius: 6px;
+      background: #0A1929; border: 1px solid #1E3A5F; color: #fff; font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <div>
+      <h1>TOOLS45000 PRO — Previsualización de firmas</h1>
+      <p>Así se verá la portada de cada documento .docx con firmas automáticas</p>
+    </div>
+    <span class="badge">Fase 1 · Firmas gráficas</span>
+  </div>
+
+  <div class="layout">
+    <div class="page">
+      <div class="logos">
+        <div class="logo-box"><div class="logo-placeholder">Logo cliente</div></div>
+        <div class="logo-box product">TOOLS45000 PRO</div>
+      </div>
+
+      <div class="doc-meta">
+        <div class="doc-code" id="doc-code">REG-SIG-001-CORP · Revisión 1</div>
+        <h2 class="doc-title" id="doc-title">Manual del Sistema Integrado<br>de Gestión SST</h2>
+        <span class="doc-type" id="doc-type">REGISTRO</span>
+        <div class="company-block">
+          <strong>Constructora Andes SpA</strong><br>
+          RUT 76.543.210-K · Construcción · 85 trabajadores
+        </div>
+      </div>
+
+      <div class="formal-section">
+        <h3>Formalización del documento</h3>
+        <table class="formal">
+          <thead>
+            <tr>
+              <th colspan="3">ELABORADO</th>
+              <th colspan="3">REVISADO</th>
+              <th colspan="4">APROBADO</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="label">Nombre</td>
+              <td colspan="2" id="elab-nombre">María González P.</td>
+              <td class="label">Nombre</td>
+              <td colspan="2" id="rev-nombre">Carlos Ruiz M.</td>
+              <td class="label">Nombre</td>
+              <td colspan="3" id="aprob-nombre">Ana Pérez V.</td>
+            </tr>
+            <tr>
+              <td class="label">Cargo</td>
+              <td colspan="2" id="elab-cargo">Encargada SST</td>
+              <td class="label">Cargo</td>
+              <td colspan="2" id="rev-cargo">Gerente de Operaciones</td>
+              <td class="label">Cargo</td>
+              <td colspan="3" id="aprob-cargo">Gerente General</td>
+            </tr>
+            <tr>
+              <td class="label">Firma</td>
+              <td colspan="2" class="sig-cell"><span class="signature auto">María González</span></td>
+              <td class="label">Firma</td>
+              <td colspan="2" class="sig-cell"><span class="signature auto">Carlos Ruiz</span></td>
+              <td class="label">Firma</td>
+              <td colspan="3" class="sig-cell"><span class="signature auto">Ana Pérez</span></td>
+            </tr>
+            <tr>
+              <td class="label">Fecha</td>
+              <td colspan="2">18/05/2026</td>
+              <td class="label">Fecha</td>
+              <td colspan="2">18/05/2026</td>
+              <td class="label">Fecha</td>
+              <td colspan="3">18/05/2026</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="footer-note">
+        Documento generado por TOOLS45000 PRO · Firmas insertadas automáticamente en los 46 documentos
+      </p>
+    </div>
+
+    <aside class="config-panel">
+      <h2>Configuración de firmantes</h2>
+
+      <div class="signer-card">
+        <div class="role">Elaborado</div>
+        <div class="name">María González P.</div>
+        <div class="cargo">Encargada SST</div>
+        <div class="mini-sig"><span>María González</span></div>
+      </div>
+
+      <div class="signer-card">
+        <div class="role">Revisado</div>
+        <div class="name">Carlos Ruiz M.</div>
+        <div class="cargo">Gerente de Operaciones</div>
+        <div class="mini-sig"><span>Carlos Ruiz</span></div>
+      </div>
+
+      <div class="signer-card">
+        <div class="role">Aprobado</div>
+        <div class="name">Ana Pérez V.</div>
+        <div class="cargo">Gerente General</div>
+        <div class="mini-sig"><span>Ana Pérez</span></div>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle"></div>
+        Aplicar a los 46 documentos
+      </div>
+
+      <div class="doc-picker">
+        <label>Cambiar documento de ejemplo</label>
+        <select id="doc-select">
+          <option value="1">REG-SIG-001 — Manual del SIG SST</option>
+          <option value="4">REG-SIG-004 — Política SST</option>
+          <option value="7">REG-SIG-007 — MIPER</option>
+          <option value="12">PRO-HSEQ-001 — Procedimiento</option>
+        </select>
+      </div>
+
+      <p class="hint">
+        En producción subirás PNG escaneados de cada firma. En Word se incrustan en la tabla de formalización que ya genera <code>generate-docx</code>.
+      </p>
+    </aside>
+  </div>
+
+  <script>
+    const docs = {
+      1: { code: 'REG-SIG-001-CORP', title: 'Manual del Sistema Integrado<br>de Gestión SST', type: 'REGISTRO' },
+      4: { code: 'REG-SIG-004-CORP', title: 'Política de Seguridad<br>y Salud en el Trabajo', type: 'REGISTRO', aprobNombre: 'Ana Pérez V.', aprobCargo: 'Representante Legal / Alta Dirección' },
+      7: { code: 'REG-SIG-007-CORP', title: 'Matriz MIPER', type: 'REGISTRO' },
+      12: { code: 'PRO-HSEQ-001-CORP', title: 'Procedimiento de Identificación<br>de Peligros', type: 'PROCEDIMIENTO' },
+    };
+    document.getElementById('doc-select').addEventListener('change', (e) => {
+      const d = docs[e.target.value];
+      document.getElementById('doc-code').textContent = d.code + ' · Revisión 1';
+      document.getElementById('doc-title').innerHTML = d.title;
+      document.getElementById('doc-type').textContent = d.type;
+      document.getElementById('aprob-nombre').textContent = d.aprobNombre || 'Ana Pérez V.';
+      document.getElementById('aprob-cargo').textContent = d.aprobCargo || 'Gerente General';
+    });
+  </script>
+</body>
+</html>

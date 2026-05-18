@@ -4,7 +4,14 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '@/store/app-store';
 import { CATEGORIES, DOCUMENT_CODES, ALL_DOCUMENTS } from '@/lib/sst-documents';
-import { SstDocumentItem, BrandingMode } from '@/types/sst';
+import {
+  SstDocumentItem,
+  BrandingMode,
+  DocBrandPalette,
+  CompanySignatories,
+  DEFAULT_SIGNATORIES,
+} from '@/types/sst';
+import { SignatureAdoptPanel } from '@/components/pulso/SignatureAdoptPanel';
 import { resolveClientLogoUrl } from '@/lib/client-logo-url';
 import { APP_PRODUCT_NAME } from '@/lib/product-brand';
 import { CreatorCredit } from '@/components/pulso/CreatorCredit';
@@ -16,7 +23,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Shield, Building2, ChevronRight, ChevronLeft, ImagePlus, Loader2, Upload, Trash2, ImageIcon, AlertTriangle, Sparkles, Zap } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Shield, Building2, ChevronRight, ChevronLeft, ImagePlus, Loader2, Upload, Trash2, ImageIcon, AlertTriangle, Sparkles, Zap, PenLine } from 'lucide-react';
 
 export default function SetupView() {
   const { setCompany, setCompanyBranding, company } = useAppStore();
@@ -28,6 +36,11 @@ export default function SetupView() {
   const [step, setStep] = useState(1);
   const [brandingMode, setBrandingMode] = useState<BrandingMode>(company?.brandingMode || 'pulso');
   const [logoData, setLogoData] = useState<string | null>(company?.logoData || null);
+  const [clientLogoPath, setClientLogoPath] = useState<string | undefined>(company?.clientLogoPath);
+  const [brandPalette, setBrandPalette] = useState<DocBrandPalette | undefined>(company?.brandPalette);
+  const [signatories, setSignatories] = useState<CompanySignatories>(
+    company?.signatories ?? DEFAULT_SIGNATORIES
+  );
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -45,12 +58,23 @@ export default function SetupView() {
         body: JSON.stringify({
           ...form,
           logoData,
+          clientLogoPath,
+          brandPalette,
+          signatories,
           brandingMode,
         }),
       });
       const data = await resp.json();
       if (data.success) {
-        setCompany(data.company);
+        setCompany({
+          ...data.company,
+          logoData: logoData ?? data.company.logoData,
+          clientLogoPath,
+          brandPalette,
+          signatories,
+          brandingMode,
+          workerCount: parseInt(form.workerCount, 10) || data.company.workerCount,
+        });
         toast.success('Empresa guardada en el repositorio');
       } else {
         toast.error(data.error || 'Error al guardar');
@@ -76,7 +100,13 @@ export default function SetupView() {
       const data = await res.json();
       if (data.success) {
         setLogoData(data.path);
-        toast.success('Logo subido correctamente');
+        if (data.clientLogoPath) setClientLogoPath(data.clientLogoPath);
+        if (data.brandPalette) {
+          setBrandPalette(data.brandPalette);
+          toast.success('Logo y colores corporativos aplicados a los documentos');
+        } else {
+          toast.success('Logo subido correctamente');
+        }
       } else {
         toast.error(data.error || 'Error al subir logo');
       }
@@ -89,6 +119,8 @@ export default function SetupView() {
 
   const handleRemoveLogo = () => {
     setLogoData(null);
+    setClientLogoPath(undefined);
+    setBrandPalette(undefined);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -130,13 +162,15 @@ export default function SetupView() {
           <CardContent className="space-y-5">
             {/* Step indicator */}
             <div className="flex items-center gap-2 mb-2">
-              {[1, 2, 3].map(s => (
+              {[1, 2, 3, 4].map(s => (
                 <div key={s} className={`flex items-center gap-2 ${step >= s ? 'text-[#00D4AA]' : 'text-[#475569]'}`}>
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 ${
                     step >= s ? 'border-[#00D4AA] bg-[#00D4AA]/10' : 'border-[#334155]'
                   }`}>{s}</div>
-                  <span className="text-sm hidden sm:inline">{s === 1 ? 'Datos Empresa' : s === 2 ? 'Identidad Visual' : 'Confirmar'}</span>
-                  {s < 3 && <div className={`w-12 h-0.5 ${step > s ? 'bg-[#00D4AA]' : 'bg-[#334155]'}`} />}
+                  <span className="text-sm hidden lg:inline">
+                    {s === 1 ? 'Datos' : s === 2 ? 'Marca' : s === 3 ? 'Firmas' : 'Confirmar'}
+                  </span>
+                  {s < 4 && <div className={`w-8 h-0.5 ${step > s ? 'bg-[#00D4AA]' : 'bg-[#334155]'}`} />}
                 </div>
               ))}
             </div>
@@ -341,6 +375,29 @@ export default function SetupView() {
                         </div>
                       </label>
                     </RadioGroup>
+
+                    {brandPalette && (
+                      <div className="rounded-lg border border-[#1E3A5F] bg-[#0A1929]/60 p-3 space-y-2 mt-4">
+                        <p className="text-xs font-medium text-[#94A3B8]">
+                          Colores detectados del logo (se aplican automáticamente en Word)
+                        </p>
+                        <div className="flex flex-wrap gap-3">
+                          {[
+                            { label: 'Principal', hex: brandPalette.primary },
+                            { label: 'Institucional', hex: brandPalette.navy },
+                            { label: 'Acento', hex: brandPalette.accent },
+                          ].map((sw) => (
+                            <div key={sw.label} className="flex items-center gap-2 text-xs text-[#CBD5E1]">
+                              <span
+                                className="w-8 h-8 rounded-md border border-white/10 shadow-inner"
+                                style={{ backgroundColor: `#${sw.hex}` }}
+                              />
+                              <span>{sw.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-between">
@@ -352,8 +409,68 @@ export default function SetupView() {
                     </Button>
                   </div>
                 </motion.div>
+              ) : step === 3 ? (
+                <motion.div key="step3sign" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                  <div className="bg-[#0A1929]/50 rounded-xl p-4 border border-[#1E3A5F]">
+                    <h3 className="font-semibold text-white flex items-center gap-2 mb-1">
+                      <PenLine className="w-5 h-5 text-[#1E4FA1]" />
+                      Adoptar firmas (estilo DocuSign)
+                    </h3>
+                    <p className="text-sm text-[#94A3B8] mb-4">
+                      Configura Elaborado, Revisado y Aprobado. Se insertan automáticamente en los 46 documentos.
+                    </p>
+                    <Tabs defaultValue="elaborado" className="w-full">
+                      <TabsList className="grid w-full grid-cols-3 bg-[#112240]">
+                        <TabsTrigger value="elaborado" className="data-[state=active]:bg-[#1E4FA1] data-[state=active]:text-white text-xs">Elaborado</TabsTrigger>
+                        <TabsTrigger value="revisado" className="data-[state=active]:bg-[#1E4FA1] data-[state=active]:text-white text-xs">Revisado</TabsTrigger>
+                        <TabsTrigger value="aprobado" className="data-[state=active]:bg-[#1E4FA1] data-[state=active]:text-white text-xs">Aprobado</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="elaborado" className="mt-4">
+                        <SignatureAdoptPanel
+                          title="Elaborado"
+                          value={signatories.elaborado}
+                          onChange={(v) => setSignatories((s) => ({ ...s, elaborado: v }))}
+                          auditSeed={`${form.rut}|ELABORADO`}
+                        />
+                      </TabsContent>
+                      <TabsContent value="revisado" className="mt-4">
+                        <SignatureAdoptPanel
+                          title="Revisado"
+                          value={signatories.revisado}
+                          onChange={(v) => setSignatories((s) => ({ ...s, revisado: v }))}
+                          auditSeed={`${form.rut}|REVISADO`}
+                        />
+                      </TabsContent>
+                      <TabsContent value="aprobado" className="mt-4">
+                        <SignatureAdoptPanel
+                          title="Aprobado"
+                          value={signatories.aprobado}
+                          onChange={(v) => setSignatories((s) => ({ ...s, aprobado: v }))}
+                          auditSeed={`${form.rut}|APROBADO`}
+                        />
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                  <div className="flex justify-between">
+                    <Button variant="outline" onClick={() => setStep(2)} className="border-[#1E3A5F] text-[#94A3B8]">
+                      <ChevronLeft className="w-4 h-4 mr-1" /> Atrás
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        if (!signatories.elaborado.fullName || !signatories.revisado.fullName || !signatories.aprobado.fullName) {
+                          toast.error('Completa el nombre de los tres firmantes');
+                          return;
+                        }
+                        setStep(4);
+                      }}
+                      className="bg-[#00D4AA] text-[#0A1929] hover:bg-[#00A888]"
+                    >
+                      Siguiente <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </div>
+                </motion.div>
               ) : (
-                <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
                   <div className="bg-[#0A1929]/50 rounded-xl p-4 border border-[#1E3A5F] space-y-3">
                     <h3 className="font-semibold text-white">Resumen de Configuración</h3>
                     <div className="grid grid-cols-2 gap-2 text-sm">
@@ -386,6 +503,14 @@ export default function SetupView() {
                       </div>
                     )}
                   </div>
+                  <div className="bg-[#0A1929]/50 rounded-xl p-4 border border-[#1E3A5F] space-y-2">
+                    <h3 className="font-semibold text-white">Firmantes</h3>
+                    <div className="text-sm space-y-1">
+                      <p className="text-[#94A3B8]">Elaborado: <span className="text-white">{signatories.elaborado.fullName}</span></p>
+                      <p className="text-[#94A3B8]">Revisado: <span className="text-white">{signatories.revisado.fullName}</span></p>
+                      <p className="text-[#94A3B8]">Aprobado: <span className="text-white">{signatories.aprobado.fullName}</span></p>
+                    </div>
+                  </div>
                   <div className="bg-[#0A1929]/50 rounded-xl p-4 border border-[#1E3A5F]">
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="w-5 h-5 text-[#F59E0B] shrink-0 mt-0.5" />
@@ -405,7 +530,7 @@ export default function SetupView() {
                     </div>
                   </div>
                   <div className="flex justify-between">
-                    <Button variant="outline" onClick={() => setStep(2)} className="border-[#1E3A5F] text-[#94A3B8]">
+                    <Button variant="outline" onClick={() => setStep(3)} className="border-[#1E3A5F] text-[#94A3B8]">
                       <ChevronLeft className="w-4 h-4 mr-1" /> Atrás
                     </Button>
                     <Button onClick={handleSubmit} className="bg-[#00D4AA] text-[#0A1929] hover:bg-[#00A888] font-semibold">

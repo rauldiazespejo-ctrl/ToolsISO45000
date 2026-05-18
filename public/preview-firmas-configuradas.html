@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Firmas configuradas — TOOLS45000 PRO</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0A1929; color: #e2e8f0; padding: 24px; }
+    h1 { color: #00D4AA; font-size: 1.25rem; margin-bottom: 8px; }
+    p { color: #94A3B8; font-size: 0.9rem; margin-bottom: 24px; }
+    .grid { display: grid; gap: 20px; max-width: 520px; margin: 0 auto; }
+    .card { background: #112240; border: 1px solid #1E3A5F; border-radius: 12px; overflow: hidden; }
+    .head { padding: 12px 16px; border-bottom: 1px solid #1E3A5F; display: flex; justify-content: space-between; align-items: center; }
+    .badge { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; }
+    .b-elab { background: #1e3a8a40; color: #93c5fd; border: 1px solid #3b82f650; }
+    .b-rev { background: #78350f40; color: #fcd34d; border: 1px solid #f59e0b50; }
+    .b-apr { background: #064e3b40; color: #6ee7b7; border: 1px solid #10b98150; }
+    .meta { padding: 8px 16px; font-size: 0.75rem; color: #94A3B8; display: grid; gap: 4px; }
+    .sig { background: #fff; margin: 0 16px 16px; border-radius: 8px; padding: 12px; min-height: 80px; display: flex; align-items: center; justify-content: center; }
+    .sig img { max-width: 100%; max-height: 72px; }
+    .loading { color: #64748B; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <h1>Firmas configuradas (ejemplo DocuSign)</h1>
+  <p>Vista de cómo quedan las tres firmas en los documentos Word. En la app verás las de tu empresa en Dashboard → pestaña Firmas o Configuración paso 3.</p>
+  <div class="grid" id="grid"></div>
+  <script>
+    const DEMO = {
+      elaborado: { role: 'ELABORADO', fullName: 'María González Pérez', jobTitle: 'Encargada SST', initials: 'MG', styleId: 'docusign-1' },
+      revisado: { role: 'REVISADO', fullName: 'Carlos Ruiz Martínez', jobTitle: 'Gerente de Operaciones', initials: 'CR', styleId: 'docusign-2' },
+      aprobado: { role: 'APROBADO', fullName: 'Ana Pérez Vidal', jobTitle: 'Gerente General', initials: 'AP', styleId: 'docusign-4' },
+    };
+    const labels = { elaborado: ['Elaborado', 'b-elab'], revisado: ['Revisado', 'b-rev'], aprobado: ['Aprobado', 'b-apr'] };
+    const grid = document.getElementById('grid');
+    for (const [key, s] of Object.entries(DEMO)) {
+      const [label, bClass] = labels[key];
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="head"><span class="badge ${bClass}">${label}</span><strong>${s.fullName}</strong></div>
+        <div class="meta"><span>Cargo: ${s.jobTitle}</span><span>Iniciales: ${s.initials}</span></div>
+        <div class="sig" id="sig-${key}"><span class="loading">Generando firma…</span></div>`;
+      grid.appendChild(card);
+      fetch('/api/signature-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...s, auditSeed: 'DEMO|' + s.role }),
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.success) {
+            const el = document.getElementById('sig-' + key);
+            el.innerHTML = `<img src="${d.preview}" alt="Firma" /><p style="font-size:9px;color:#64748B;margin-top:6px;text-align:center;font-family:monospace">${d.auditId}</p>`;
+          }
+        });
+    }
+  </script>
+</body>
+</html>

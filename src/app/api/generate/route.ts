@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ZAI from 'z-ai-web-dev-sdk';
+import { buildChileSstSystemPrompt, buildChileSstUserSuffix } from '@/lib/chile-sst-prompt';
 
 const GENERATION_TIMEOUT = 120_000; // 2 minutes
 
@@ -17,38 +18,7 @@ interface GenerateRequest {
 }
 
 function buildSystemPrompt(): string {
-  return `Eres un experto en Seguridad y Salud en el Trabajo (SST) en Chile, con profundo conocimiento de:
-- Decreto Supremo N° 44 (DS 44) y sus modificaciones
-- ISO 45001:2018 - Sistema de Gestión de Seguridad y Salud en el Trabajo
-- Ley N° 16.744 sobre Accidentes del Trabajo y Enfermedades Profesionales
-- Normativas SUSESO, ISL, Mutualidades de Seguridad
-- Convenios de la OIT relativos a SST
-- Normas chilenas NCh aplicables (NCh 1411/4, NCh 3180, etc.)
-
-Tu tarea es generar documentos técnicos SST profesionales, completos y listos para uso.
-
-REGLAS DE GENERACIÓN:
-1. Todo el contenido debe estar en ESPAÑOL (Chile).
-2. El documento debe ser en formato Markdown con estructura clara.
-3. El contenido debe ser técnico, profesional y aplicable a la realidad chilena.
-4. Incluir referencias normativas específicas cuando corresponda.
-5. Adaptar el contenido al tamaño de empresa y sector indicado.
-6. Usar terminología técnica SST correcta.
-7. Generar contenido sustancial (no resúmenes), incluyendo tablas, listas y secciones detalladas cuando sea apropiado.
-
-ESTRUCTURA DEL DOCUMENTO:
-El documento DEBE incluir las siguientes secciones (adaptadas según el tipo de documento):
-
-1. **Encabezado** con código de documento, nombre, versión
-2. **Objetivo** - Propósito del documento
-3. **Alcance** - Ámbito de aplicación
-4. **Base Legal / Normativa Aplicable** - Referencias a DS 44, ISO 45001, Ley 16.744, etc.
-5. **Desarrollo** - Contenido principal (la sección más extensa)
-6. **Responsabilidades** - Quiénes son responsables
-7. **Registros Asociados** - Formularios, actas, registros
-8. **Vigencia y Revisión** - Período de validez y proceso de actualización
-
-Genera el documento completo y detallado. No uses placeholders como "[nombre empresa]" — usa los datos proporcionados.`;
+  return buildChileSstSystemPrompt();
 }
 
 function buildUserPrompt(data: GenerateRequest): string {
@@ -74,7 +44,13 @@ function buildUserPrompt(data: GenerateRequest): string {
 - Descripción/Alcance: ${data.description}
 - Referencia Normativa: ${data.normRef}
 
-Genera el documento completo en formato Markdown con todas las secciones indicadas en las instrucciones. El contenido debe ser detallado, profesional y directamente aplicable a la empresa indicada. Adapta la profundidad y complejidad según el tamaño de la empresa (una MIPYME necesita procedimientos más simples que una gran empresa).`;
+Genera el documento completo en formato Markdown con todas las secciones indicadas en las instrucciones. El contenido debe ser detallado, profesional y directamente aplicable a la empresa indicada. Adapta la profundidad y complejidad según el tamaño de la empresa (una MIPYME necesita procedimientos más simples que una gran empresa).${buildChileSstUserSuffix({
+    docNumber: data.docNumber,
+    normRef: data.normRef,
+    size: data.size,
+    workerCount: data.workerCount,
+    sector: data.sector,
+  })}`;
 }
 
 async function generateWithTimeout(

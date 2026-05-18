@@ -7,10 +7,20 @@ import { ALL_DOCUMENTS } from '@/lib/sst-documents';
 const VALID_STATUSES = ['Pendiente', 'En Proceso', 'Completado', 'No Aplica'] as const;
 
 // Schema for updating a document
+const aiReviewSchema = z.object({
+  approved: z.boolean(),
+  score: z.number(),
+  summary: z.string(),
+  revisedAt: z.string().optional(),
+});
+
 const updateDocumentSchema = z.object({
+  companyId: z.string().optional(),
   number: z.number().int().min(1).max(46),
   status: z.enum(VALID_STATUSES).optional(),
   generatedContent: z.string().optional(),
+  auditChecks: z.record(z.string(), z.boolean()).optional(),
+  aiReview: aiReviewSchema.nullable().optional(),
   version: z.number().int().min(1).optional(),
   docxPath: z.string().optional(),
 });
@@ -53,6 +63,12 @@ export async function GET(request: NextRequest) {
         id: dbDoc?.id || null,
         status: dbDoc?.status || defaultDoc.status,
         generatedContent: dbDoc?.generatedContent || null,
+        auditChecks: dbDoc?.auditChecksJson
+          ? (JSON.parse(dbDoc.auditChecksJson) as Record<string, boolean>)
+          : undefined,
+        aiReview: dbDoc?.aiReviewJson
+          ? (JSON.parse(dbDoc.aiReviewJson) as { approved: boolean; score: number; summary: string })
+          : undefined,
         docxPath: dbDoc?.docxPath || null,
         version: dbDoc?.version || 1,
         createdAt: dbDoc?.createdAt || null,
@@ -91,10 +107,12 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const { number, status, generatedContent, version, docxPath } = result.data;
+    const { companyId, number, status, generatedContent, auditChecks, aiReview, version, docxPath } =
+      result.data;
 
-    // Company must exist
-    const company = await db.company.findFirst();
+    const company = companyId
+      ? await db.company.findUnique({ where: { id: companyId } })
+      : await db.company.findFirst();
     if (!company) {
       return NextResponse.json(
         { success: false, error: 'No hay empresa configurada. Configure la empresa primero.' },
@@ -123,12 +141,15 @@ export async function PUT(request: NextRequest) {
       const updateData: any = {};
       if (status !== undefined) updateData.status = status;
       if (generatedContent !== undefined) updateData.generatedContent = generatedContent;
+      if (auditChecks !== undefined) updateData.auditChecksJson = JSON.stringify(auditChecks);
+      if (aiReview !== undefined) {
+        updateData.aiReviewJson = aiReview ? JSON.stringify(aiReview) : null;
+      }
       if (version !== undefined) updateData.version = version;
       if (docxPath !== undefined) updateData.docxPath = docxPath;
 
-      // If content is generated, ensure status is Completado
       if (generatedContent && !status) {
-        updateData.status = 'Completado';
+        updateData.status = 'En Proceso';
       }
 
       updatedDoc = await db.sstDocument.update({
@@ -151,9 +172,13 @@ export async function PUT(request: NextRequest) {
       };
 
       if (generatedContent !== undefined) createData.generatedContent = generatedContent;
+      if (auditChecks !== undefined) createData.auditChecksJson = JSON.stringify(auditChecks);
+      if (aiReview !== undefined) {
+        createData.aiReviewJson = aiReview ? JSON.stringify(aiReview) : null;
+      }
       if (version !== undefined) createData.version = version;
       if (docxPath !== undefined) createData.docxPath = docxPath;
-      if (generatedContent) createData.status = 'Completado';
+      if (generatedContent && !status) createData.status = 'En Proceso';
 
       updatedDoc = await db.sstDocument.create({
         data: createData,

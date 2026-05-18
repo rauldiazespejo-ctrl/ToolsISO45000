@@ -153,9 +153,8 @@ export default function AdaptDocumentView() {
       return;
     }
     store.updateDocumentContent(selectedDoc.number, analysisResult.updatedContent);
-    store.updateDocumentStatus(selectedDoc.number, 'Completado');
-    toast.success('Documento actualizado guardado exitosamente');
-    store.setCurrentView('document');
+    toast.success('Documento adaptado. Completa el checklist anti-devolución.');
+    store.openDocumentWorkflow(selectedDoc.number, 'auditoria');
   };
 
   const renderMarkdown = (md: string) => {
