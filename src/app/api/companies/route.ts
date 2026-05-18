@@ -29,29 +29,32 @@ export async function POST(request: NextRequest) {
     }
 
     // Create or update company
-    const company = await db.company.upsert({
-      where: { id: data.id || 'new-uuid' },
-      update: {
-        name: data.name,
-        rut: data.rut,
-        business: data.business,
-        address: data.address,
-        size: data.size,
-        workerCount: parseInt(data.workerCount) || 0,
-        sector: data.sector,
-        logoData: data.logoData,
-      },
-      create: {
-        name: data.name,
-        rut: data.rut,
-        business: data.business,
-        address: data.address,
-        size: data.size,
-        workerCount: parseInt(data.workerCount) || 0,
-        sector: data.sector,
-        logoData: data.logoData,
-      },
-    });
+    const companyPayload = {
+      name: data.name,
+      rut: data.rut,
+      business: data.business || '',
+      address: data.address || '',
+      size: data.size || 'MIPYME',
+      workerCount: parseInt(data.workerCount) || 0,
+      sector: data.sector || '',
+      logoData: data.logoData || null,
+      brandingMode: data.brandingMode || 'pulso',
+      clientLogoPath: data.clientLogoPath || null,
+    };
+
+    let company;
+    if (data.id) {
+      // Update existing company
+      company = await db.company.update({
+        where: { id: data.id },
+        data: companyPayload,
+      });
+    } else {
+      // Create new company
+      company = await db.company.create({
+        data: companyPayload,
+      });
+    }
 
     // Initialize documents if it's a new company
     const docCount = await db.sstDocument.count({ where: { companyId: company.id } });

@@ -344,11 +344,11 @@ export default function AdaptDocumentView() {
                   </TabsContent>
 
                   <TabsContent value="paste" className="mt-4">
-                    <textarea
+                    <Textarea
                       value={pastedContent}
                       onChange={e => setPastedContent(e.target.value)}
                       placeholder="Pegue aquí el contenido de su documento existente..."
-                      className="min-h-[200px] bg-[#0A1929] border-[#1E3A5F] text-white placeholder:text-[#475569] resize-y"
+                      className="min-h-[200px] bg-[#0A1929] border border-[#1E3A5F] text-white placeholder:text-[#475569] resize-y focus:border-[#00D4AA] focus:ring-0"
                     />
                   </TabsContent>
                 </Tabs>

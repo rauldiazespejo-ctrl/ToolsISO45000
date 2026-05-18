@@ -285,7 +285,9 @@ export default function DashboardView() {
                                 <FileDown className="w-3 h-3" />
                                 <span className="hidden sm:inline ml-1">.docx</span>
                               </Button>
-                              <Button size="sm" variant="ghost" className="text-[#64748B] text-xs h-7 px-2"><Eye className="w-3 h-3" /></Button>
+                              <Button size="sm" variant="ghost" className="text-[#64748B] text-xs h-7 px-2" onClick={() => { store.setSelectedDocNumber(doc.number); store.setCurrentView('document'); }}>
+                                <Eye className="w-3 h-3" />
+                              </Button>
                             </>
                           )}
                         </div>

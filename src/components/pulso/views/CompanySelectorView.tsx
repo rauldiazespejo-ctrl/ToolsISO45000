@@ -11,7 +11,7 @@ import { CreatorCredit } from '@/components/pulso/CreatorCredit';
 import { CompanyData } from '@/types/sst';
 
 export default function CompanySelectorView() {
-  const { setCompany, setCompanies, companies, setCurrentView } = useAppStore();
+  const { setCompany, setCompanies, companies } = useAppStore();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,8 +40,8 @@ export default function CompanySelectorView() {
       const data = await res.json();
       if (data.success) {
         useAppStore.getState().setDocuments(data.documents);
+        // setCompany already navigates to 'dashboard' internally
         setCompany(comp);
-        setCurrentView('dashboard');
       }
     } catch (error) {
       console.error('Failed to load company documents:', error);
@@ -51,7 +51,7 @@ export default function CompanySelectorView() {
   };
 
   const handleCreateNew = () => {
-    setCurrentView('setup');
+    useAppStore.getState().setCurrentView('setup');
   };
 
   return (

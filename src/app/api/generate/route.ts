@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     const userPrompt = buildUserPrompt(body);
 
     // Attempt generation with retry
-    let content: string;
+    let content: string = '';
     let retries = 0;
     const maxRetries = 2;
 
@@ -153,9 +153,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (!content) {
+      return NextResponse.json(
+        { success: false, error: 'El modelo no generó contenido. Intente nuevamente.' },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      content: content!,
+      content,
     });
   } catch (error) {
     console.error('Generate API error:', error);

@@ -8,18 +8,20 @@ datasource db {
 }
 
 model Company {
-  id          String   @id @default(cuid())
-  name        String   // Razón Social
-  rut         String   // RUT empresa
-  business    String   // Giro
-  address     String   // Dirección
-  size        String   // MIPYME / Mediana / Grande
-  workerCount Int      // Número de trabajadores
-  sector      String   // Sector económico
-  logoData    String?  @db.Text // Base64 logo data
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  documents   SstDocument[]
+  id             String   @id @default(cuid())
+  name           String   // Razón Social
+  rut            String   // RUT empresa
+  business       String   // Giro
+  address        String   // Dirección
+  size           String   // MIPYME / Mediana / Grande
+  workerCount    Int      // Número de trabajadores
+  sector         String   // Sector económico
+  logoData       String?  @db.Text // Base64 logo data
+  brandingMode   String   @default("pulso") // pulso | soldesp | both
+  clientLogoPath String?  // Path to uploaded client logo
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  documents      SstDocument[]
 }
 
 model SstDocument {
