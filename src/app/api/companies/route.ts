@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { CATEGORIES, ALL_DOCUMENTS } from '@/lib/sst-documents';
+import { ALL_DOCUMENTS } from '@/lib/sst-documents';
 
 export async function GET() {
   try {
@@ -28,34 +28,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Nombre y RUT son obligatorios' }, { status: 400 });
     }
 
-    // Create or update company
-    const company = await db.company.upsert({
-      where: { id: data.id || 'new-uuid' },
-      update: {
-        name: data.name,
-        rut: data.rut,
-        business: data.business,
-        address: data.address,
-        size: data.size,
-        workerCount: parseInt(data.workerCount) || 0,
-        sector: data.sector,
-        logoData: data.logoData,
-      },
-      create: {
-        name: data.name,
-        rut: data.rut,
-        business: data.business,
-        address: data.address,
-        size: data.size,
-        workerCount: parseInt(data.workerCount) || 0,
-        sector: data.sector,
-        logoData: data.logoData,
-      },
-    });
+    let company;
 
-    // Initialize documents if it's a new company
+    // If an existing id is provided, update; otherwise always create new
+    if (data.id) {
+      const existing = await db.company.findUnique({ where: { id: data.id } });
+      if (existing) {
+        company = await db.company.update({
+          where: { id: data.id },
+          data: {
+            name: data.name,
+            rut: data.rut,
+            business: data.business || '',
+            address: data.address || '',
+            size: data.size || 'MIPYME',
+            workerCount: parseInt(data.workerCount) || 0,
+            sector: data.sector || '',
+            logoData: data.logoData ?? existing.logoData,
+            brandingMode: data.brandingMode || existing.brandingMode || 'pulso',
+          },
+        });
+      }
+    }
+
+    if (!company) {
+      company = await db.company.create({
+        data: {
+          name: data.name,
+          rut: data.rut,
+          business: data.business || '',
+          address: data.address || '',
+          size: data.size || 'MIPYME',
+          workerCount: parseInt(data.workerCount) || 0,
+          sector: data.sector || '',
+          logoData: data.logoData || null,
+          brandingMode: data.brandingMode || 'pulso',
+        },
+      });
+    }
+
+    // Initialize documents only for new companies (no documents yet)
     const docCount = await db.sstDocument.count({ where: { companyId: company.id } });
-    
+
     if (docCount === 0) {
       const docsToCreate = ALL_DOCUMENTS.map(doc => ({
         companyId: company.id,
@@ -70,9 +84,7 @@ export async function POST(request: NextRequest) {
         status: doc.status,
       }));
 
-      await db.sstDocument.createMany({
-        data: docsToCreate,
-      });
+      await db.sstDocument.createMany({ data: docsToCreate });
     }
 
     return NextResponse.json({ success: true, company });

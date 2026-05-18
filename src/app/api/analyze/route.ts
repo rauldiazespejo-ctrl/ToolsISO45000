@@ -80,7 +80,6 @@ ${fileText.slice(0, 8000)}
 
 REQUISITO NORMATIVO DEL DOCUMENTO:
 - Nombre: ${docName}
-- Descripción: ${docDescription}
 - Referencia Normativa: ${normRef}
 - Empresa: ${companyName}
 
@@ -103,33 +102,76 @@ Lista de contenido desactualizado que necesita actualizarse
 ## 5. REFERENCIAS NORMATIVAS FALTANTES
 Referencias a DS 44, ISO 45001, Ley 16.744 u otras normas que faltan
 
-## 6. PROPUESTA DE DOCUMENTO ACTUALIZADO
+## 6. CAMBIOS PROPUESTOS (JSON)
+Genera un array JSON con los cambios específicos. Formato EXACTO (sin texto adicional antes ni después del JSON):
+\`\`\`json
+[
+  {"section": "Nombre de sección", "original": "texto original", "proposed": "texto propuesto"},
+  ...
+]
+\`\`\`
+
+## 7. PROPUESTA DE DOCUMENTO ACTUALIZADO
 Genera el contenido completo del documento actualizado integrando todo lo anterior.
 
 Responde en español, con formato markdown estructurado.`;
 
     const completion = await zai.chat.completions.create({
       messages: [
-        { role: 'assistant', content: analysisPrompt },
-        { role: 'user', content: `Analiza el documento de "${docName}" para ${companyName} y genera el informe de brechas y propuesta de actualización.` },
+        { role: 'system', content: 'Eres un auditor experto en SST chileno. Responde siempre en español con formato markdown.' },
+        { role: 'user', content: analysisPrompt },
       ],
-      thinking: { type: 'disabled' },
     });
 
     const analysis = completion.choices[0]?.message?.content || 'No se pudo generar el análisis';
 
+    // Extract updated document (section 7)
     let updatedContent = '';
-    const section6Match = analysis.match(/## 6\.\s*PROPUESTA[\s\S]*$/i);
-    if (section6Match) {
-      updatedContent = section6Match[0].replace(/^## 6\.\s*PROPUESTA[^\n]*\n?/i, '').trim();
+    const section7Match = analysis.match(/## 7\.\s*PROPUESTA[\s\S]*$/i);
+    if (section7Match) {
+      updatedContent = section7Match[0].replace(/^## 7\.\s*PROPUESTA[^\n]*\n?/i, '').trim();
+    }
+
+    // Extract gap report (sections 1-5)
+    const gapReport = analysis.replace(/## 6\.[\s\S]*$/i, '').trim();
+
+    // Extract changes JSON from section 6
+    const changes: { id: number; section: string; original: string; proposed: string; accepted: boolean }[] = [];
+    const jsonMatch = analysis.match(/```json\s*([\s\S]*?)```/i);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1].trim());
+        if (Array.isArray(parsed)) {
+          parsed.forEach((item: { section: string; original: string; proposed: string }, idx: number) => {
+            changes.push({
+              id: idx + 1,
+              section: item.section || `Cambio ${idx + 1}`,
+              original: item.original || '',
+              proposed: item.proposed || '',
+              accepted: true,
+            });
+          });
+        }
+      } catch {
+        // If JSON parse fails, create a single generic change entry
+        changes.push({
+          id: 1,
+          section: 'Actualización general',
+          original: 'Contenido original del documento',
+          proposed: 'Contenido actualizado según normativa vigente',
+          accepted: true,
+        });
+      }
     }
 
     return NextResponse.json({
       success: true,
-      analysis,
-      originalContent: fileText,
-      updatedContent,
-      originalFileName: file?.name || 'contenido pegado',
+      result: {
+        gapReport,
+        originalContent: fileText,
+        updatedContent,
+        changes,
+      },
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Error al analizar el documento';

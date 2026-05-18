@@ -33,15 +33,16 @@ export default function CompanySelectorView() {
 
   const handleSelectCompany = async (comp: CompanyData) => {
     if (!comp.id) return;
-    
+
     setLoading(true);
     try {
       const res = await fetch(`/api/companies/${comp.id}/documents`);
       const data = await res.json();
       if (data.success) {
+        // setDocuments before setCompany so the dashboard renders with correct docs
         useAppStore.getState().setDocuments(data.documents);
-        setCompany(comp);
-        setCurrentView('dashboard');
+        // setCompany already sets currentView → 'dashboard' internally
+        setCompany({ ...comp, brandingMode: comp.brandingMode || 'pulso' });
       }
     } catch (error) {
       console.error('Failed to load company documents:', error);

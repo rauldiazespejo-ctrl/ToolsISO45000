@@ -16,7 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
-import { Shield, Building2, Users, Search, Filter, Download, RefreshCw, ChevronRight, ChevronLeft, CheckCircle2, Clock, AlertTriangle, XCircle, Sparkles, Menu, X, Eye, Loader2, Zap, FileText, FileDown, Target, TrendingUp, Upload, ClipboardCheck, Wrench, ImageIcon, ImagePlus, Trash2, Settings } from 'lucide-react';
+import { Shield, Search, CheckCircle2, Clock, XCircle, Sparkles, Menu, X, Eye, Loader2, FileDown, ClipboardCheck, Settings } from 'lucide-react';
+import { SstDocumentItem } from '@/types/sst';
 import { toast } from 'sonner';
 
 export default function DashboardView() {
@@ -27,7 +28,7 @@ export default function DashboardView() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [generatingDoc, setGeneratingDoc] = useState<number | null>(null);
 
-  const handleGenerate = async (doc) => {
+  const handleGenerate = async (doc: SstDocumentItem) => {
     if (!company) return;
     setGeneratingDoc(doc.number);
     store.setIsGenerating(true);
@@ -66,7 +67,7 @@ export default function DashboardView() {
     }
   };
 
-  const handleDownload = async (doc) => {
+  const handleDownload = async (doc: SstDocumentItem) => {
     try {
       const res = await fetch('/api/generate-docx', {
         method: 'POST',
@@ -87,7 +88,7 @@ export default function DashboardView() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${DOCUMENT_CODES[doc.number] || `DOC-${doc.number}`}_${doc.name.replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ0-9]/g, '_')}.docx`;
+      a.download = `${DOCUMENT_CODES[doc.number] ?? `DOC-${doc.number}`}_${doc.name.replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ0-9]/g, '_')}.docx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
