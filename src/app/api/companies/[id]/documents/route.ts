@@ -3,10 +3,10 @@ import { db } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await context.params;
     const documents = await db.sstDocument.findMany({
       where: { companyId: id },
       orderBy: { number: 'asc' },

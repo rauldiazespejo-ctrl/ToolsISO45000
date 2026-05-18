@@ -11,7 +11,7 @@ const companySchema = z.object({
   size: z.enum(['MIPYME', 'Mediana', 'Grande']),
   workerCount: z.number().int().min(1, 'Debe tener al menos 1 trabajador'),
   sector: z.string().min(1, 'El sector es requerido'),
-  logoPath: z.string().optional(),
+  logoData: z.string().optional(),
 });
 
 // POST: Save or update company data
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
           size: data.size,
           workerCount: data.workerCount,
           sector: data.sector,
-          ...(data.logoPath ? { logoPath: data.logoPath } : {}),
+          ...(data.logoData ? { logoData: data.logoData } : {}),
         },
       });
     } else {
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
           size: data.size,
           workerCount: data.workerCount,
           sector: data.sector,
-          ...(data.logoPath ? { logoPath: data.logoPath } : {}),
+          ...(data.logoData ? { logoData: data.logoData } : {}),
         },
       });
     }
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         size: company.size,
         workerCount: company.workerCount,
         sector: company.sector,
-        logoPath: company.logoPath,
+        logoData: company.logoData,
         createdAt: company.createdAt,
         updatedAt: company.updatedAt,
       },
@@ -115,7 +115,7 @@ export async function GET() {
         size: company.size,
         workerCount: company.workerCount,
         sector: company.sector,
-        logoPath: company.logoPath,
+        logoData: company.logoData,
         createdAt: company.createdAt,
         updatedAt: company.updatedAt,
       },
