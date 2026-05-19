@@ -9,11 +9,18 @@ export function DashboardWorkflowSummary() {
   const wf = store.getWorkflowStats();
   const sig = areSignatoriesComplete(store.company?.signatories);
 
+  const docsWithCompliance = store.documents.filter((d) => Boolean(d.complianceTrace)).length;
+  const docsWithEvidence = store.documents.filter(
+    (d) => (d.complianceTrace?.requiredEvidence?.length ?? 0) > 0,
+  ).length;
+
   const rows = [
     { icon: Bot, label: 'Con contenido IA', value: wf.withContent, color: 'text-[#94A3B8]' },
     { icon: Bot, label: 'Aprobados por agentes', value: wf.aiApproved, color: 'text-[#00D4AA]' },
     { icon: Bot, label: 'Pend. corrección IA', value: wf.awaitingAi, color: 'text-[#F59E0B]' },
     { icon: ClipboardCheck, label: 'Checklist listo', value: wf.checklistReady, color: 'text-[#8B5CF6]' },
+    { icon: ClipboardCheck, label: 'Con trazabilidad legal', value: docsWithCompliance, color: 'text-[#38BDF8]' },
+    { icon: ClipboardCheck, label: 'Con evidencia exigible', value: docsWithEvidence, color: 'text-[#22C55E]' },
   ];
 
   return (

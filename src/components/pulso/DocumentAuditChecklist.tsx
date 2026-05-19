@@ -55,6 +55,27 @@ export function DocumentAuditChecklist({
         <p className="text-xs text-[#64748B] mt-1">{progress.percent}% verificado</p>
       </CardHeader>
       <CardContent className="space-y-3">
+        {doc.complianceTrace && (
+          <div className="rounded-lg border border-[#1E3A5F] bg-[#0A1929]/60 p-3 space-y-2">
+            <p className="text-xs text-[#00D4AA] font-semibold uppercase tracking-wide">Evidencia mínima exigible (Chile)</p>
+            {doc.complianceTrace.requiredEvidence.length > 0 ? (
+              <div className="space-y-2">
+                {doc.complianceTrace.requiredEvidence.map((ev) => (
+                  <div key={ev.id} className="rounded-md border border-[#1E3A5F] bg-[#0A1929] p-2">
+                    <p className="text-sm text-white">{ev.name}</p>
+                    <p className="text-[11px] text-[#64748B] mt-1">
+                      {ev.ownerRole} · {ev.frequency} · retención: {ev.retention}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-[#94A3B8]">
+                Este documento no declara evidencias específicas adicionales en la base actual.
+              </p>
+            )}
+          </div>
+        )}
         {!hasGeneratedContent && (
           <div className="flex items-start gap-2 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-3 text-sm text-[#FCD34D]">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />

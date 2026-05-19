@@ -15,6 +15,7 @@ MARCO NORMATIVO PRIORITARIO (Chile):
 
 PRINCIPIO DE EXCELENCIA ANTE AUDITOR:
 El documento debe ser defendible ante un auditor de DT, ISL, mutualidad o organismo de certificación. Evita generalidades que permitan observaciones del tipo "no demuestra cumplimiento".
+Debe incluir trazabilidad legal explícita con versión normativa y vigencia declarada.
 
 REGLAS OBLIGATORIAS DE CONTENIDO:
 1. Redactar en español de Chile (terminología: trabajador/a, empleador, faena, MIPER, CPHS, delegado de seguridad, etc.).
@@ -26,7 +27,8 @@ REGLAS OBLIGATORIAS DE CONTENIDO:
 7. Incluir tablas operativas (matrices, cronogramas, listas de verificación) cuando el tipo de documento lo requiera.
 8. Sección explícita "Criterios de aceptación / Evidencia para auditoría" con ítems verificables.
 9. Sección "Referencias normativas" con lista numerada de normas chilenas aplicables al documento.
-10. No inventar datos numéricos no proporcionados; si falta un dato, indicar el criterio de definición por la organización.
+10. Incluir sección "Trazabilidad legal y control de vigencia" con: norma, artículo, versión regulatoria, fecha de vigencia y criterio de aplicabilidad.
+11. No inventar datos numéricos no proporcionados; si falta un dato, indicar el criterio de definición por la organización.
 
 ESTRUCTURA MÍNIMA DEL DOCUMENTO:
 1. **Identificación** — Código, nombre, versión, empresa, fecha de emisión.
@@ -38,7 +40,8 @@ ESTRUCTURA MÍNIMA DEL DOCUMENTO:
 7. **Responsabilidades** — Matriz cargo / función / evidencia.
 8. **Registros y documentos asociados** — Nombre, responsable, frecuencia, tiempo de retención.
 9. **Criterios de aceptación / Evidencia para auditoría**
-10. **Vigencia, revisión y control de cambios**
+10. **Trazabilidad legal y control de vigencia** — tabla: Norma | Artículo | Versión regulatoria | Vigencia | Evidencia exigible.
+11. **Vigencia, revisión y control de cambios**
 
 CALIDAD REDACCIONAL:
 - Tono técnico-profesional, imperativo en procedimientos ("deberá", "debe verificarse").
@@ -59,6 +62,7 @@ REQUISITOS ADICIONALES PARA ESTE DOCUMENTO (N° ${data.docNumber}):
 - Referencia normativa del catálogo: ${data.normRef.replace(/\n/g, '; ')}
 - Tamaño empresa: ${data.size} | Trabajadores: ${data.workerCount} | Sector: ${data.sector}
 - Verificar obligaciones específicas del DS 44 para este tamaño de entidad empleadora.
+- Declarar versión regulatoria utilizada y vigencia normativa en Chile para cada referencia legal utilizada.
 - Incluir al menos una tabla de verificación o matriz operativa si el documento es de gestión o procedimiento.
 - Cerrar con lista numerada de evidencias que el auditor podría solicitar en terreno o en revisión documental.`;
 }

@@ -6,6 +6,7 @@ import {
 import { runDocumentFixerAgent } from '@/lib/agents/document-fixer';
 import { runDocumentGeneratorAgent, type DocumentGenerateInput } from '@/lib/agents/document-generator';
 import { runDocumentCorpusReviseAgent } from '@/lib/agents/document-corpus-revise';
+import { runDocumentComplianceReviewerAgent } from '@/lib/agents/document-compliance-reviewer';
 import { validateDocumentRules, rulesToDocumentReview } from '@/lib/document/validate-rules';
 
 const MAX_FIX_ITERATIONS = 2;
@@ -20,17 +21,26 @@ export interface DocumentPipelineResult {
 
 function mergeReviews(
   ruleReview: AgentReviewResult,
-  aiReview: DocumentReviewResult
+  aiReview: DocumentReviewResult,
+  complianceReview: DocumentReviewResult
 ): DocumentReviewResult {
-  const findings = [...ruleReview.findings, ...aiReview.findings];
+  const findings = [...ruleReview.findings, ...aiReview.findings, ...complianceReview.findings];
   const blocking = findings.filter((f) => f.severity === 'bloqueante');
-  const score = Math.round((ruleReview.score + aiReview.score) / 2);
+  const score = Math.round((ruleReview.score + aiReview.score + complianceReview.score) / 3);
   return {
-    approved: blocking.length === 0 && score >= 78 && aiReview.approved && ruleReview.approved,
+    approved:
+      blocking.length === 0 &&
+      score >= 78 &&
+      aiReview.approved &&
+      ruleReview.approved &&
+      complianceReview.approved,
     score,
     findings,
-    summary: `Reglas: ${ruleReview.summary} | Revisor IA: ${aiReview.summary}`,
-    suggestedPatches: aiReview.suggestedPatches,
+    summary: `Reglas: ${ruleReview.summary} | Revisor IA: ${aiReview.summary} | Compliance: ${complianceReview.summary}`,
+    suggestedPatches: [
+      ...(aiReview.suggestedPatches ?? []),
+      ...(complianceReview.suggestedPatches ?? []),
+    ],
   };
 }
 
@@ -114,7 +124,21 @@ async function runReviewAndFixLoop(
       };
     }
 
-    const review = mergeReviews(ruleReview, aiReview);
+    pushStep(pipelineLog, 'document-compliance-reviewer', `Compliance legal (iter. ${iterations})`, 'running');
+    const complianceReview = await runDocumentComplianceReviewerAgent({
+      docNumber: meta.docNumber,
+      docName: meta.docName,
+      content,
+    });
+    pushStep(
+      pipelineLog,
+      'document-compliance-reviewer',
+      `Compliance legal (iter. ${iterations})`,
+      'done',
+      `Score ${complianceReview.score}% — ${complianceReview.approved ? 'Cumple' : 'Con brechas'}`
+    );
+
+    const review = mergeReviews(ruleReview, aiReview, complianceReview);
     pushStep(
       pipelineLog,
       'document-reviewer',
@@ -144,7 +168,17 @@ async function runReviewAndFixLoop(
       approved: false,
       score: 60,
       findings: [],
-      summary: 'Revisión final omitida por error',
+      summary: 'Revisión final IA omitida por error',
+    })),
+    await runDocumentComplianceReviewerAgent({
+      docNumber: meta.docNumber,
+      docName: meta.docName,
+      content,
+    }).catch(() => ({
+      approved: false,
+      score: 60,
+      findings: [],
+      summary: 'Revisión final compliance omitida por error',
     }))
   );
   return { content, review: finalReview, iterations };

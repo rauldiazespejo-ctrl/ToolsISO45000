@@ -414,6 +414,46 @@ export default function DocumentDetailView() {
                     </Badge>
                   </div>
                 </div>
+
+                {doc.complianceTrace && (
+                  <div className="rounded-lg border border-[#1E3A5F] bg-[#0A1929] p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-[#00D4AA] uppercase tracking-wider font-semibold">
+                        Trazabilidad legal Chile
+                      </p>
+                      <Badge className="bg-[#00D4AA]/10 text-[#00D4AA] border-[#00D4AA]/30">
+                        Auditoría Ready
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2">
+                      {doc.complianceTrace.legalReferences.map((ref, idx) => (
+                        <div key={`${ref.body}-${ref.article}-${idx}`} className="rounded-md border border-[#1E3A5F] bg-[#112240] p-3">
+                          <p className="text-sm text-white font-medium">
+                            {ref.body} · {ref.article}
+                          </p>
+                          <p className="text-xs text-[#94A3B8] mt-1">{ref.title}</p>
+                          <p className="text-[11px] text-[#64748B] mt-1">
+                            Versión: {ref.version}{ref.effectiveDate ? ` · Vigencia: ${ref.effectiveDate}` : ''}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="rounded-md border border-[#1E3A5F] bg-[#112240] p-3">
+                      <p className="text-xs text-[#00D4AA] uppercase tracking-wider font-semibold mb-2">
+                        Criterios mínimos de aceptación
+                      </p>
+                      <ul className="space-y-1">
+                        {doc.complianceTrace.minimumAuditCriteria.map((criterion, idx) => (
+                          <li key={`${idx}-${criterion}`} className="text-xs text-[#CBD5E1] list-disc ml-4">
+                            {criterion}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

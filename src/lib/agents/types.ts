@@ -7,6 +7,7 @@ export type AgentRole =
   | 'document-generator'
   | 'document-corpus-revise'
   | 'document-reviewer'
+  | 'document-compliance-reviewer'
   | 'document-fixer';
 
 export type AgentStepStatus = 'pending' | 'running' | 'done' | 'error' | 'skipped';

@@ -19,6 +19,24 @@ export interface SstDocumentItem {
     summary: string;
     revisedAt?: string;
   };
+  /** Trazabilidad legal chilena para auditoría/fiscalización */
+  complianceTrace?: {
+    legalReferences: Array<{
+      body: string;
+      article: string;
+      title: string;
+      version: string;
+      effectiveDate?: string;
+    }>;
+    requiredEvidence: Array<{
+      id: string;
+      name: string;
+      frequency: string;
+      ownerRole: string;
+      retention: string;
+    }>;
+    minimumAuditCriteria: string[];
+  };
 }
 
 export type BrandingMode = 'pulso' | 'soldesp' | 'both';

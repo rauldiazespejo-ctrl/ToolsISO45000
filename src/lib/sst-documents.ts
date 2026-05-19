@@ -1,4 +1,5 @@
 import { SstDocumentItem } from '@/types/sst';
+import { buildDocumentComplianceTrace } from '@/lib/chile-compliance';
 
 export const CATEGORIES = [
   { id: 'A', name: 'Fundamentos', color: '#00D4AA' },
@@ -65,7 +66,7 @@ export const DOCUMENT_TYPES: Record<number, 'PRO' | 'REG'> = {
   45: 'REG', 46: 'REG',
 };
 
-export const ALL_DOCUMENTS: SstDocumentItem[] = [
+const ALL_DOCUMENTS_BASE: SstDocumentItem[] = [
   { number: 1, category: 'A', categoryName: 'Fundamentos', name: 'Determinación del Contexto, Alcance y Partes Interesadas', description: 'Determinar las cuestiones internas y externas pertinentes, identificar las partes interesadas y definir el alcance del SG-SST conforme al DS 44 y la ISO 45001.', responsible: 'Alta Dirección / SST', priority: 'Alta', normSource: 'DS 44 + ISO 45001', normRef: 'DS 44 Art. 3, 4\nISO 45001 §4.1, 4.2', status: 'Pendiente' },
   { number: 2, category: 'A', categoryName: 'Fundamentos', name: 'Clasificación de la Entidad Empleadora según Tamaño', description: 'Clasificar la empresa en MIPYME (hasta 25 trabajadores), Mediana (26-99) o Gran Empresa (100+). Determina obligaciones específicas en materia preventiva.', responsible: 'SST / RRHH', priority: 'Alta', normSource: 'DS 44', normRef: 'DS 44 Art. 4', status: 'Pendiente' },
   { number: 3, category: 'A', categoryName: 'Fundamentos', name: 'Registro de Trabajadores y Trabajadoras según Tabla de Riesgos', description: 'Identificar y registrar a todos los trabajadores clasificándolos según la tabla de actividades y su nivel de riesgo conforme al DS 44.', responsible: 'SST / RRHH', priority: 'Alta', normSource: 'DS 44', normRef: 'DS 44 Art. 5', status: 'Pendiente' },
@@ -113,3 +114,28 @@ export const ALL_DOCUMENTS: SstDocumentItem[] = [
   { number: 45, category: 'L', categoryName: 'Fiscalización', name: 'Formulario Único de Fiscalización (FUF DS 44) — Autoevaluación', description: 'Autoevaluación para verificar cumplimiento normativo antes de fiscalizaciones ISL/DT: estructura preventiva, instrumentos, participación, vigilancia.', responsible: 'SST / Gerencia General', priority: 'Alta', normSource: 'DS 44', normRef: 'DS 44 Art. 72 y ss.', status: 'Pendiente' },
   { number: 46, category: 'L', categoryName: 'Fiscalización', name: 'Plan de Preparación para Fiscalizaciones del DS 44', description: 'Verificación previa cumplimiento, organización documentación, simulacros auditoría, designación acompañantes, plan atención observaciones.', responsible: 'SST / Gerencia General', priority: 'Alta', normSource: 'DS 44', normRef: 'DS 44 Art. 72 y ss.', status: 'Pendiente' },
 ];
+
+export const ALL_DOCUMENTS: SstDocumentItem[] = ALL_DOCUMENTS_BASE.map((doc) => {
+  const trace = buildDocumentComplianceTrace(doc.number, doc.name);
+
+  return {
+    ...doc,
+    complianceTrace: {
+      legalReferences: trace.legalReferences.map((ref) => ({
+        body: ref.body,
+        article: ref.article,
+        title: ref.title,
+        version: ref.version,
+        effectiveDate: ref.effectiveDate,
+      })),
+      requiredEvidence: trace.requiredEvidence.map((ev) => ({
+        id: ev.id,
+        name: ev.name,
+        frequency: ev.frequency,
+        ownerRole: ev.ownerRole,
+        retention: ev.retention,
+      })),
+      minimumAuditCriteria: trace.minimumAuditCriteria,
+    },
+  };
+});
